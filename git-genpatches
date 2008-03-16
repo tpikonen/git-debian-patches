@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+# Usage: genpatches basep integb featb1 featb2  ...
+
+import os,sys,warnings
+
+expat = '*/debian/*'
+
+def frob(cmd):
+    print cmd
+    return os.system(cmd)
+
+def gitdiff(b1, b2, pname, excludepat):
+    ex = ""
+    if len(excludepat) > 0:
+        ex = " | filterdiff -x " + excludepat
+    cmd = "git diff "+ b1 + ".." + b2 + " | filterdiff" + ex + " > " + pname
+    return frob(cmd)
+
+warnings.simplefilter('ignore', RuntimeWarning)
+
+base = sys.argv[1]
+intg = sys.argv[2]
+npatches = len(sys.argv)-3
+
+tmpbranch = os.path.basename(os.tempnam())
+cmd = "git checkout -b " + tmpbranch + " " + base
+frob(cmd)
+
+featpatches = [os.tempnam()]
+gitdiff(base, sys.argv[3], featpatches[0], expat)
+revpatches = [];
+for i in range(1,npatches):
+    featpatches.append(os.tempnam())
+    gitdiff(base, sys.argv[i+3], featpatches[i], expat)
+    tname = os.tempnam()
+    cmd = "minrevert -o " + tname + " " + featpatches[i-1] + " " + featpatches[i]
+    frob(cmd)
+    try:
+        os.stat(tname)
+        revpatches.append(tname)
+    except:
+        revpatches.append("")
+
+#print featpatches
+#print revpatches
+tmpdir = os.tempnam()
+os.makedirs(tmpdir)
+tmpdir = tmpdir + "/"
+
+pno = 1
+patchnames = []
+patchnames.append(tmpdir + ("%02d_" % pno) + os.path.basename(sys.argv[3]) + ".patch")
+os.rename(featpatches[0], patchnames[0])
+pno = pno+1
+for i in range(1,npatches):
+    if len(revpatches[i-1]) > 0:
+        patchnames.append(tmpdir + ("%02d_" % pno) + "conflicts" + ".patch")
+        os.rename(revpatches[i-1], patchnames[pno-1])
+        pno = pno+1
+    patchnames.append(tmpdir + ("%02d_" % pno) + os.path.basename(sys.argv[i+3]) + ".patch")
+    os.rename(featpatches[i], patchnames[pno-1])
+    pno = pno+1
+    
+#print patchnames
+
+for patch in patchnames:
+    cmd = "git apply " + patch
+    frob(cmd)
+    
+cmd = "git commit -a -m 'Feature patches applied'"
+frob(cmd)
+
+patchnames.append(tmpdir + ("%02d_" % pno) + "rest" + ".patch")
+
+gitdiff("HEAD", intg, patchnames[pno-1], expat)
+cmd = "git apply --index " + patchnames[pno-1]
+frob(cmd)
+cmd = "git commit -a -m 'Rest patch applied'"
+frob(cmd)
+
+cmd = "git diff HEAD.." + intg + " | filterdiff | filterdiff -x " + expat + " | wc -l"
+status = frob(cmd)
+print "diff exit code: " + str(status)
+#if status > 255:
+#    print "Found differences not representable in the final patch, exiting."
+#    sys.exit(1)
+    
+cmd = "git checkout " + intg
+frob(cmd)
+cmd = "git branch -D " + tmpbranch
+frob(cmd)
