@@ -2,15 +2,17 @@
 """Create a series of patches to take a branch to another through a number
 of feature branches.
 
-Usage: %(program)s [ options ] <baseb> <integb> <featb1> <featb2>  ...
+Usage: %(program)s [ --patchdir=<dir> | -p <dir> ]
+                   [ --exclude <pattern> | -x <pattern> ]
+                   [ --series ]
+                   --base <commit-ish> --int <commit-ish> [ <commit-ish> ... ]
 
-All arguments are heads, tags or commits, i.e. tree-ish.
 """
 
 # Author: Teemu Ikonen <tpikonen@gmail.com>
 # This program is in public domain
 
-import os,sys,warnings,getopt,shutil
+import os,sys,warnings,getopt,shutil,subprocess,fnmatch
 
 program = sys.argv[0]
 warnings.simplefilter('ignore', RuntimeWarning)
@@ -25,6 +27,31 @@ def frob(cmd):
     print cmd
     return os.system(cmd)
 
+def getrefs():
+    cmd = r"git-show-ref | sed -e 's,.*refs/[^ /]*/\([^ ]*\).*,\1,'"
+    print cmd
+    f = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+    refs = [line.strip() for line in f.readlines() ]
+    f.close()
+    return refs
+
+def iscommit(name):
+    if len(name) == 0:
+        return False
+    cmd = "git-name-rev " + name
+    print cmd
+    f = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+    output = f.readline()
+    f.close()
+    if len(output) > 0:
+        return True
+    else:
+        return False
+
+def checkref(name):
+    if not iscommit(name):
+        usage(1, "'" + name + "' is not a valid commit")
+
 def gitdiff(b1, b2, pname, exlist):
     ex = ""
     if exlist:
@@ -34,16 +61,22 @@ def gitdiff(b1, b2, pname, exlist):
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hp:x:s", \
-        ["help", "patchdir=", "exclude=", "series"])
+        opts, args = getopt.getopt(sys.argv[1:], "hb:i:p:x:s", \
+        ["help", "base", "int", "patchdir=", "exclude=", "series"])
     except getopt.GetoptError, err:
         usage(2, err.msg)
+    base = ""
+    intg = ""
     patchdir = "debian/patches/"
     exlist = []
     series = False
     for o, a in opts:
         if o in ("-h", "--help"):
             usage(0)
+        elif o in ("-b", "--base"):
+            base = a
+        elif o in ("-i", "--int"):
+            intg = a
         elif o in ("-p", "--patchdir"):
             patchdir = a
         elif o in ("-x", "--exclude"):
@@ -52,16 +85,26 @@ def main():
             series = True
         else:
             assert False, "unhandled option"
-    if len(args) < 2:
-        usage(0)
 
     if not os.path.isdir(patchdir):
-        print >> sys.stderr, "Output directory", patchdir, "not found, exiting..."
-        sys.exit(1)
+        usage(1, "Output directory", patchdir, "not found, exiting...")
     patchdir = patchdir + "/"
-    base = args[0]
-    intg = args[1]
-    npatches = len(args)-2
+
+    checkref(base)
+    checkref(intg)
+
+    allrefs = getrefs()
+    frefs = []
+    for name in args:
+        l = fnmatch.filter(allrefs, name)
+        if l:
+            frefs = frefs + l
+        elif iscommit(name):
+            frefs.append(name)
+        else:
+            usage(1, "Could not match '" + name + "' to a ref.")
+    frefs = sorted(list(set(frefs)))
+    npatches = len(frefs)
 
     cmd = 'git stash save "Local changes saved by git-genpatches"'
     frob(cmd)
@@ -70,16 +113,16 @@ def main():
     cmd = "git checkout -b " + tmpbranch + " " + base
     frob(cmd)
 
-    featpatches = []
+    fpatches = []
     revpatches = [];    
     if npatches > 0:
-        featpatches.append(os.tempnam())    
-        gitdiff(base, args[2], featpatches[0], exlist)
+        fpatches.append(os.tempnam())
+        gitdiff(base, frefs[0], fpatches[0], exlist)
     for i in range(1,npatches):
-        featpatches.append(os.tempnam())
-        gitdiff(base, args[i+2], featpatches[i], exlist)
+        fpatches.append(os.tempnam())
+        gitdiff(base, frefs[i], fpatches[i], exlist)
         tname = os.tempnam()
-        cmd = "minrevert -o " + tname + " " + featpatches[i-1] + " " + featpatches[i]
+        cmd = "minrevert -o " + tname + " " + fpatches[i-1] + " " + fpatches[i]
         frob(cmd)
         try:
             s = os.stat(tname)
@@ -91,7 +134,7 @@ def main():
         except:
             revpatches.append("")
 
-    #print featpatches
+    #print fpatches
     #print revpatches
 #    tmpdir = os.tempnam()
 #    os.makedirs(tmpdir)
@@ -100,8 +143,8 @@ def main():
     pno = 1
     patchnames = []
     def movefeat(i, n):
-        patchnames.append(("%02d_" % n) + os.path.basename(args[i+2]) + ".patch")
-        shutil.move(featpatches[i], patchdir + patchnames[n-1])
+        patchnames.append(("%02d_" % n) + os.path.basename(frefs[i]) + ".patch")
+        shutil.move(fpatches[i], patchdir + patchnames[n-1])
     def moverev(i, n):
         patchnames.append(("%02d_" % n) + "conflicts" + ".patch")
         shutil.move(revpatches[i], patchdir + patchnames[n-1])        
