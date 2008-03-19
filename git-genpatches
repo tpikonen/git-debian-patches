@@ -7,6 +7,14 @@ Usage: %(program)s [ --patchdir=<dir> | -p <dir> ]
                    [ --series ]
                    --base <commit-ish> --int <commit-ish> [ <commit-ish> ... ]
 
+Options: 
+    -b|--base <commit-ish> Commit to base the patches to. Default 'upstream'.
+    -i|--int <commit-ish> Commit ending the patch stack. Default 'debian'.
+    -p|--patchdir <dir> Directory where patches are stored. 
+        Default 'debian/patches'.
+    -x|--exclude <pattern> Exclude pattern fed to 'filterdiff -x'. 
+        You can specify more patterns by giving this option more than once.
+    -s|--series Write out a quilt type series file to patchdir.
 """
 
 # Author: Teemu Ikonen <tpikonen@gmail.com>
@@ -65,8 +73,8 @@ def main():
         ["help", "base", "int", "patchdir=", "exclude=", "series"])
     except getopt.GetoptError, err:
         usage(2, err.msg)
-    base = ""
-    intg = ""
+    base = "upstream"
+    intg = "debian"
     patchdir = "debian/patches/"
     exlist = []
     series = False
