@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """Create a patch reverting another patch partially.
 
-Usage: %(program)s [-o outfile] patch_a patch_b
+Usage: %(program)s [-o outpatch] patch_a patch_b
 
 If patch_a and patch_b are two diffs which independently apply cleanly to a
-source tree, minrevert outputs a minimal patch such that when patch_a and
-this patch are applied, patch_b also applies cleanly. 
-"""
+source tree, %(program)s outputs a minimal patch outpatch such that a stack of
+patch_a, outpatch and patch_b applies cleanly to the original source tree.  """
 
 # Author: Teemu Ikonen <tpikonen@gmail.com>
 # This program is in public domain
