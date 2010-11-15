@@ -1,19 +1,25 @@
 #!/bin/sh
 set -e
 
-patchdir="debian/patches/"
-seriesfile="${patchdir}series"
+patchdir="debian/patches"
+metadir="debian/metapatches"
+seriesfile="${patchdir}/series"
 prefix="p/"
+pext=".patch"
+
 dh_testdir
 echo -n '' > $seriesfile
 i=1
-for branch in $(git branch | grep "^ *${prefix}")
+for metafile in ${metadir}/*
 do
-    ident=$(echo $branch | sed -n "s,^ *${prefix},,p")
-    patchname=$(printf "%02d_%s.patch" $i $ident)
+    patchname=$(basename $metafile)
+    branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
+    outfile=${patchdir}/${patchname}${pext}
     i=$(expr ${i} + 1)
-    echo $patchname
-    rm -f ${patchdir}/${patchname}
-    git diff upstream..${branch} > ${patchdir}/${patchname}
-    echo $patchname >> $seriesfile
+    echo $outfile
+    rm -f ${outfile}
+    cat $metafile > $outfile
+    echo "---" >> $outfile
+    git diff -p --stat upstream..${branch} >> $outfile
+    echo ${patchname}${pext} >> $seriesfile
 done
