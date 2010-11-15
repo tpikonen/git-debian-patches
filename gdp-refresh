@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+patchdir="debian/patches/"
+seriesfile="${patchdir}series"
+prefix="p/"
+dh_testdir
+echo -n '' > $seriesfile
+i=1
+for branch in $(git branch | grep "^ *${prefix}")
+do
+    ident=$(echo $branch | sed -n "s,^ *${prefix},,p")
+    patchname=$(printf "%02d_%s.patch" $i $ident)
+    i=$(expr ${i} + 1)
+    echo $patchname
+    rm -f ${patchdir}/${patchname}
+    git diff upstream..${branch} > ${patchdir}/${patchname}
+    echo $patchname >> $seriesfile
+done
