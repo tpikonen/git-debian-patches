@@ -36,7 +36,7 @@ refresh ()
 # If $VERSION is not given, get it from debian/changelog.
 # Tag for the debian branch (usually 'master') has the name debian/$VERSION,
 # patch branch tags are tagged with the name $PATCHBRANCH/$VERSION
-tag-heads ()
+tagheads ()
 {
     dh_testdir
     version=$1
@@ -61,7 +61,7 @@ case $1 in
     refresh)
         shift ; refresh ;;
     tag-heads)
-        shift ; tag-heads $@ ;;
+        shift ; tagheads $@ ;;
     *)
         echo "$PROGNAME: Error: Unknown subcommand." >&2
         exit 1 ;;
