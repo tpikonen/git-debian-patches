@@ -6,8 +6,10 @@ metadir="debian/metapatches"
 seriesfile="${patchdir}/series"
 prefix="p/"
 pext=".patch"
+debbranch="master"
 
 
+# Recreate patches from a git branch and metapatch files.
 refresh ()
 {
     dh_testdir
@@ -29,11 +31,38 @@ refresh ()
 }
 
 
+# tag-heads [$VERSION]
+# Tag current git branch heads with the (debian) version.
+# If $VERSION is not given, get it from debian/changelog.
+# Tag for the debian branch (usually 'master') has the name debian/$VERSION,
+# patch branch tags are tagged with the name $PATCHBRANCH/$VERSION
+tag-heads ()
+{
+    dh_testdir
+    version=$1
+    # FIXME: Check if the version string makes sense
+    if [ -z ${version} ] && [ "${version+xxx}" = "xxx" ] ; then
+        version=$(dpkg-parsechangelog | sed -n 's/^Version: \(.*\)$/\1/p')
+    fi
+    i=1
+    for metafile in ${metadir}/*
+    do
+        branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
+        echo "Tagging ${branch} with ${branch}/${version}"
+        git tag ${branch}/${version} ${branch}
+    done
+    echo "Tagging ${debbranch} with debian/${version}"
+    git tag debian/${version} ${debbranch}
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     refresh)
-        refresh ;;
+        shift ; refresh ;;
+    tag-heads)
+        shift ; tag-heads $@ ;;
     *)
-        echo "$PROGNAME: Error: Unknown command." >&2
+        echo "$PROGNAME: Error: Unknown subcommand." >&2
         exit 1 ;;
 esac
