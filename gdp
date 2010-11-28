@@ -1,0 +1,39 @@
+#!/bin/sh
+set -e
+
+patchdir="debian/patches"
+metadir="debian/metapatches"
+seriesfile="${patchdir}/series"
+prefix="p/"
+pext=".patch"
+
+
+refresh ()
+{
+    dh_testdir
+    echo -n '' > $seriesfile
+    i=1
+    for metafile in ${metadir}/*
+    do
+        patchname=$(basename $metafile)
+        branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
+        outfile=${patchdir}/${patchname}${pext}
+        i=$(expr ${i} + 1)
+        echo $outfile
+        rm -f ${outfile}
+        cat $metafile > $outfile
+        echo "---" >> $outfile
+        git diff -p --stat upstream..${branch} >> $outfile
+        echo ${patchname}${pext} >> $seriesfile
+    done
+}
+
+
+PROGNAME=$(basename $0)
+case $1 in
+    refresh)
+        refresh ;;
+    *)
+        echo "$PROGNAME: Error: Unknown command." >&2
+        exit 1 ;;
+esac
