@@ -7,7 +7,7 @@ seriesfile="${patchdir}/series"
 prefix="p/"
 pext=".patch"
 debbranch="master"
-
+upbranch="upstream"
 
 # Recreate patches from a git branch and metapatch files.
 refresh ()
@@ -25,7 +25,7 @@ refresh ()
         rm -f ${outfile}
         cat $metafile > $outfile
         echo "---" >> $outfile
-        git diff -p --stat upstream..${branch} >> $outfile
+        git diff -p --stat ${upbranch}..${branch} >> $outfile
         echo ${patchname}${pext} >> $seriesfile
     done
 }
@@ -56,12 +56,25 @@ tagheads ()
 }
 
 
+# import-orig tarballname
+# Import the tarball to $debbranch and pristine-tar branches,
+# but do not merge the to master
+importorig ()
+{
+    dh_testdir
+    tball=$1
+    git import-orig --no-merge --pristine-tar --upstream-branch=${upbranch} ${tball}
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     refresh)
         shift ; refresh ;;
     tag-heads)
         shift ; tagheads $@ ;;
+    import-orig)
+        shift ; importorig $@ ;;
     *)
         echo "$PROGNAME: Error: Unknown subcommand." >&2
         exit 1 ;;
