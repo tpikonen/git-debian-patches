@@ -13,6 +13,7 @@ upbranch="upstream"
 refresh ()
 {
     dh_testdir
+    rm -f ${patchdir}/debian-changes-*
     echo -n '' > $seriesfile
     i=1
     for metafile in ${metadir}/*
