@@ -32,6 +32,16 @@ refresh ()
 }
 
 
+# build
+# Refresh the patches and build the sources with debuild.
+build ()
+{
+    dh_testdir
+    refresh
+    debuild
+}
+
+
 # tag-heads [$VERSION]
 # Tag current git branch heads with the (debian) version.
 # If $VERSION is not given, get it from debian/changelog.
@@ -101,6 +111,8 @@ PROGNAME=$(basename $0)
 case $1 in
     refresh)
         shift ; refresh ;;
+    build)
+        shift ; build ;;
     tag-heads)
         shift ; tagheads $@ ;;
     import-orig)
