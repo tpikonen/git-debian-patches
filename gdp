@@ -73,6 +73,7 @@ importorig ()
 # start the editor with a partially filled DEP-3 header in $metadir
 newpatch ()
 {
+    dh_testdir
     patchname=$1
     if [ ${#patchname} -lt 1 ] ; then
         echo "You must give a patch name."
