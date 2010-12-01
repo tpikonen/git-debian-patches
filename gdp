@@ -68,6 +68,34 @@ importorig ()
 }
 
 
+# newpatch patchname
+# Create a new patch branch branching from current upstream and
+# start the editor with a partially filled DEP-3 header in $metadir
+newpatch ()
+{
+    patchname=$1
+    if [ ${#patchname} -lt 1 ] ; then
+        echo "You must give a patch name."
+        exit 1
+    fi
+    npatches=$(ls $metadir | wc -l)
+    pnum=$(expr $npatches + 1)
+    echo "You have $npatches patches."
+    branchname=${prefix}${patchname}
+    echo "Creating a new branch $branchname ..."
+    git branch $branchname $upbranch
+    metaname=$(printf "%s/%02d_%s" $metadir $pnum $patchname)
+    echo "Creating metapatch $metaname ..."
+    cat > $metaname << EOF_really
+From: $DEBFULLNAME <$DEBEMAIL>
+Subject: 
+X-git-branch: $branchname
+EOF_really
+    echo "Launching $EDITOR $metaname ..."
+    $EDITOR $metaname
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     refresh)
@@ -76,6 +104,8 @@ case $1 in
         shift ; tagheads $@ ;;
     import-orig)
         shift ; importorig $@ ;;
+    new-patch)
+        shift ; newpatch $@ ;;
     *)
         echo "$PROGNAME: Error: Unknown subcommand." >&2
         exit 1 ;;
