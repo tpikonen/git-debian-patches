@@ -89,6 +89,13 @@ newpatch ()
         echo "You must give a patch name."
         exit 1
     fi
+    if [ ! -d $metadir ] ; then
+        if [ -e $metadir ] ; then
+            echo "Error: $metadir exists, but is not a directory."
+            exit 1
+        fi
+        mkdir -p $metadir
+    fi
     npatches=$(ls $metadir | wc -l)
     pnum=$(expr $npatches + 1)
     echo "You have $npatches patches."
