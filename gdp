@@ -14,7 +14,7 @@ refresh ()
 {
     dh_testdir
     rm -f ${patchdir}/debian-changes-*
-    echo -n '' > $seriesfile
+    rm -f $seriesfile
     i=1
     for metafile in ${metadir}/*
     do
@@ -22,12 +22,16 @@ refresh ()
         branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
         outfile=${patchdir}/${patchname}${pext}
         i=$(expr ${i} + 1)
-        echo $outfile
         rm -f ${outfile}
-        cat $metafile > $outfile
-        echo "---" >> $outfile
-        git diff -p --stat ${upbranch}..${branch} >> $outfile
-        echo ${patchname}${pext} >> $seriesfile
+        if git diff --quiet ${upbranch}..${branch} ; then
+            echo "$branch is empty."
+        else
+            cat $metafile > $outfile
+            echo "---" >> $outfile
+            git diff -p --stat ${upbranch}..${branch} >> $outfile
+            echo ${patchname}${pext} >> $seriesfile
+            printf "%-30s -> %s\n" $branch $outfile
+        fi
     done
 }
 
