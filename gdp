@@ -118,6 +118,32 @@ EOF_really
 }
 
 
+# pick patchbranch [<commit-ish>]
+# Cherry-pick a given commit to a patchbranch.
+# If a commit is not given, use current HEAD.
+pick ()
+{
+    echo $#
+    if [ $# -lt 1 ] ; then
+        echo "You must give a patch branch name."
+        exit 1
+    fi
+    branch=$(git rev-parse --symbolic --verify $1 2> /dev/null) \
+        || (echo "$1 is not a valid branch." ; exit 1)
+    if [ $# -lt 2 ] ; then
+        commit=$(git rev-parse --verify HEAD 2> /dev/null)
+    else
+        commit=$(git rev-parse --verify $2 2> /dev/null) \
+            || (echo "$2 is not a valid commit." ; exit 1)
+    fi
+    currbranch=$(git symbolic-ref HEAD)
+    currbranch=${currbranch##refs/heads/}
+    git checkout $branch
+    git cherry-pick $commit
+    git checkout $currbranch
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     refresh)
@@ -130,6 +156,8 @@ case $1 in
         shift ; importorig $@ ;;
     new-patch)
         shift ; newpatch $@ ;;
+    pick)
+        shift ; pick $@ ;;
     *)
         echo "$PROGNAME: Error: Unknown subcommand." >&2
         exit 1 ;;
