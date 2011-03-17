@@ -7,12 +7,12 @@ Usage: %(program)s [ --patchdir=<dir> | -p <dir> ]
                    [ --series ]
                    --base <commit-ish> --int <commit-ish> [ <commit-ish> ... ]
 
-Options: 
+Options:
     -b|--base <commit-ish> Commit to base the patches to. Default 'upstream'.
     -i|--int <commit-ish> Commit ending the patch stack. Default 'debian'.
-    -p|--patchdir <dir> Directory where patches are stored. 
+    -p|--patchdir <dir> Directory where patches are stored.
         Default 'debian/patches'.
-    -x|--exclude <pattern> Exclude pattern fed to 'filterdiff -x'. 
+    -x|--exclude <pattern> Exclude pattern fed to 'filterdiff -x'.
         You can specify more patterns by giving this option more than once.
     -s|--series Write out a quilt type series file to patchdir.
 """
@@ -25,15 +25,18 @@ import os,sys,warnings,getopt,shutil,subprocess,fnmatch
 program = sys.argv[0]
 warnings.simplefilter('ignore', RuntimeWarning)
 
+
 def usage(code, msg=''):
     print >> sys.stderr, __doc__ % globals()
     if msg:
         print >> sys.stderr, msg
     sys.exit(code)
 
+
 def frob(cmd):
     print cmd
     return os.system(cmd)
+
 
 def getrefs():
     cmd = r"git-show-ref | sed -e 's,.*refs/[^ /]*/\([^ ]*\).*,\1,'"
@@ -42,6 +45,7 @@ def getrefs():
     refs = [line.strip() for line in f.readlines() ]
     f.close()
     return refs
+
 
 def iscommit(name):
     if len(name) == 0:
@@ -56,9 +60,11 @@ def iscommit(name):
     else:
         return False
 
+
 def checkref(name):
     if not iscommit(name):
         usage(1, "'" + name + "' is not a valid commit")
+
 
 def gitdiff(b1, b2, pname, exlist):
     ex = ""
@@ -66,6 +72,7 @@ def gitdiff(b1, b2, pname, exlist):
         ex = " | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "")
     cmd = "git diff "+ b1 + ".." + b2 + " | filterdiff" + ex + " > " + pname
     return frob(cmd)
+
 
 def main():
     try:
@@ -116,13 +123,13 @@ def main():
 
     cmd = 'git stash save "Local changes saved by git-genpatches"'
     frob(cmd)
-    
+
     tmpbranch = os.path.basename(os.tempnam())
     cmd = "git checkout -b " + tmpbranch + " " + base
     frob(cmd)
 
     fpatches = []
-    revpatches = [];    
+    revpatches = [];
     if npatches > 0:
         fpatches.append(os.tempnam())
         gitdiff(base, frefs[0], fpatches[0], exlist)
@@ -137,7 +144,7 @@ def main():
             if s.st_size > 0:
                 revpatches.append(tname)
             else:
-                revpatches.append("")                
+                revpatches.append("")
                 os.remove(tname)
         except:
             revpatches.append("")
@@ -155,7 +162,7 @@ def main():
         shutil.move(fpatches[i], patchdir + patchnames[n-1])
     def moverev(i, n):
         patchnames.append(("%02d_" % n) + "conflicts" + ".patch")
-        shutil.move(revpatches[i], patchdir + patchnames[n-1])        
+        shutil.move(revpatches[i], patchdir + patchnames[n-1])
     if npatches > 0:
         movefeat(0, pno)
     pno = pno+1
@@ -165,11 +172,11 @@ def main():
             pno = pno+1
         movefeat(i, pno)
         pno = pno+1
-    
+
     for patch in patchnames:
         cmd = "git apply --index " + patchdir + patch
         frob(cmd)
-    
+
     cmd = "git commit -m 'Feature patches applied'"
     frob(cmd)
 
@@ -199,7 +206,6 @@ def main():
     cmd = "git branch -D " + tmpbranch
     frob(cmd)
 
-    
+
 if __name__ == "__main__":
     main()
-        
