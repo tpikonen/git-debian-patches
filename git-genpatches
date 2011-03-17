@@ -95,7 +95,7 @@ def main():
             assert False, "unhandled option"
 
     if not os.path.isdir(patchdir):
-        usage(1, "Output directory", patchdir, "not found, exiting...")
+        usage(1, "Output directory "+patchdir+" not found, exiting...")
     patchdir = patchdir + "/"
 
     checkref(base)
