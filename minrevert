@@ -14,14 +14,16 @@ import getopt, sys, os, subprocess
 
 program = sys.argv[0]
 
+
 def usage(code, msg=''):
     print >> sys.stderr, __doc__ % globals()
     if msg:
         print >> sys.stderr, msg
     sys.exit(code)
-    
-# return a list of hunk range tuples
+
+
 def gethunks(filename, patchname):
+    """Return a list of hunk range tuples."""
     def tuplify(x):
         if x == []:
             return []
@@ -34,8 +36,10 @@ def gethunks(filename, patchname):
     f.close()
     return hunks
 
-# return indices of range tuples in inhunks which overlap with tuples in fihunks
+
 def get_conflicts(inhunks, fihunks):
+    """Return indices of ranges in `inhunks` overlapping w. ranges in `fihunks`.
+    """
     i = -1
     fip = 0
     conflicts = []
@@ -46,19 +50,20 @@ def get_conflicts(inhunks, fihunks):
             if fip >= len(fihunks):
                 break
             fihunk = fihunks[fip]
-            # hunk before fihunk        
-            if hunk[1] < fihunk[0]: 
+            # hunk before fihunk
+            if hunk[1] < fihunk[0]:
                 nextin = True
-            # overlap    
+            # overlap
             elif (hunk[1] >= fihunk[0] and hunk[1] <= fihunk[1]) \
               or (hunk[0] >= fihunk[0] and hunk[0] <= fihunk[1]) \
               or (hunk[0] <= fihunk[0] and hunk[1] >= fihunk[1]) :
                 conflicts.append(i)
                 nextin = True
             # hunk after fihunk
-            elif hunk[0] > fihunk[1]: 
+            elif hunk[0] > fihunk[1]:
                 fip = fip+1
     return conflicts
+
 
 def main():
     try:
@@ -75,7 +80,7 @@ def main():
                 if not a == "-":
                     outfile = open(a, "w")
             except:
-                print "Could not open output file ", a 
+                print "Could not open output file ", a
                 sys.exit(1)
         else:
             assert False, "unhandled option"
@@ -96,12 +101,12 @@ def main():
         for n in confhunks:
             confstr = confstr + str(n+1) + ","
         confstr = confstr[0:len(confstr)-1]
-        
         if len(confstr) > 0:
             cmd = "filterdiff -i " + el + " --hunks=" + confstr + " " + inpatch
             subprocess.Popen(cmd, shell=True, stdout=outfile).wait()
             outfile.flush()
     outfile.close()
+
 
 if __name__ == "__main__":
     main()
