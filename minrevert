@@ -103,6 +103,7 @@ def main():
         confstr = confstr[0:len(confstr)-1]
         if len(confstr) > 0:
             cmd = "filterdiff -i " + el + " --hunks=" + confstr + " " + inpatch
+            cmd = cmd + " | interdiff /dev/stdin /dev/null"
             subprocess.Popen(cmd, shell=True, stdout=outfile).wait()
             outfile.flush()
     outfile.close()
