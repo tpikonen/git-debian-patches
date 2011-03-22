@@ -148,11 +148,13 @@ def main():
     pno = 1
     patchnames = []
     def movefeat(i, n):
-        patchnames.append(("%02d_" % n) + os.path.basename(frefs[i]) + ".patch")
-        shutil.move(fpatches[i], patchdir + patchnames[n-1])
+        pname = "%02d_%s.patch" % (n, os.path.basename(frefs[i]))
+        patchnames.append(pname)
+        shutil.move(fpatches[i], patchdir + pname)
     def moverev(i, n):
-        patchnames.append(("%02d_" % n) + "conflicts" + ".patch")
-        shutil.move(revpatches[i], patchdir + patchnames[n-1])
+        pname = "%02d_CONFLICTS_IN_%s.patch"%(n, os.path.basename(frefs[i+1]))
+        patchnames.append(pname)
+        shutil.move(revpatches[i], patchdir + pname)
     if npatches > 0:
         movefeat(0, pno)
     pno = pno+1
@@ -163,7 +165,7 @@ def main():
         movefeat(i, pno)
         pno = pno+1
 
-    patchnames.append(("%02d_" % pno) + "rest" + ".patch")
+    patchnames.append(("%02d_" % pno) + "RESOLUTION" + ".patch")
 
     gitdiff("HEAD", dest, patchdir + patchnames[pno-1], exlist)
     cmd = "git apply --index " + patchdir + patchnames[pno-1]
