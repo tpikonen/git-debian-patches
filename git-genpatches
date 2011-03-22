@@ -1,36 +1,15 @@
 #!/usr/bin/env python
-"""Create a series of patches to take a branch to another through a number
-of feature branches.
-
-Usage: %(program)s [ --patchdir=<dir> | -p <dir> ]
-                   [ --exclude <pattern> | -x <pattern> ]
-                   [ --series ]
-                   --base <commit-ish> --int <commit-ish> [ <commit-ish> ... ]
-
-Options:
-    -b|--base <commit-ish> Commit to base the patches to. Default 'upstream'.
-    -i|--int <commit-ish> Commit ending the patch stack. Default 'debian'.
-    -p|--patchdir <dir> Directory where patches are stored.
-        Default 'debian/patches'.
-    -x|--exclude <pattern> Exclude pattern fed to 'filterdiff -x'.
-        You can specify more patterns by giving this option more than once.
-    -s|--series Write out a quilt type series file to patchdir.
-"""
-
 # Author: Teemu Ikonen <tpikonen@gmail.com>
 # This program is in public domain
 
-import os,sys,warnings,getopt,shutil,subprocess,fnmatch
+import os, sys, shutil, subprocess, fnmatch
+from optparse import OptionParser
 
-program = sys.argv[0]
-warnings.simplefilter('ignore', RuntimeWarning)
+description="""\
+Create a series of patches to take a branch to another through a number
+of feature branches."""
 
-
-def usage(code, msg=''):
-    print >> sys.stderr, __doc__ % globals()
-    if msg:
-        print >> sys.stderr, msg
-    sys.exit(code)
+usage="%prog [options] <commit-ish> ... "
 
 
 def frob(cmd):
@@ -61,11 +40,6 @@ def iscommit(name):
         return False
 
 
-def checkref(name):
-    if not iscommit(name):
-        usage(1, "'" + name + "' is not a valid commit")
-
-
 def gitdiff(b1, b2, pname, exlist):
     ex = ""
     if exlist:
@@ -75,38 +49,40 @@ def gitdiff(b1, b2, pname, exlist):
 
 
 def main():
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "hb:i:p:x:s", \
-        ["help", "base", "int", "patchdir=", "exclude=", "series"])
-    except getopt.GetoptError, err:
-        usage(2, err.msg)
-    base = "upstream"
-    intg = "debian"
-    patchdir = "debian/patches/"
-    exlist = []
-    series = False
-    for o, a in opts:
-        if o in ("-h", "--help"):
-            usage(0)
-        elif o in ("-b", "--base"):
-            base = a
-        elif o in ("-i", "--int"):
-            intg = a
-        elif o in ("-p", "--patchdir"):
-            patchdir = a
-        elif o in ("-x", "--exclude"):
-            exlist.append(a)
-        elif o in ("-s", "--series"):
-            series = True
-        else:
-            assert False, "unhandled option"
-
-    if not os.path.isdir(patchdir):
-        usage(1, "Output directory "+patchdir+" not found, exiting...")
+    default_base = "upstream"
+    default_dest = "master"
+    default_patchdir = "debian/patches/"
+    oprs = OptionParser(usage=usage, description=description)
+    oprs.add_option("-b", "--base", type="string", dest="base", \
+        default=default_base, metavar="<commit-ish>", \
+        help="Commit to base the patches to. Default '%s'." % default_base)
+    oprs.add_option("-d", "--dest", type="string", dest="dest", \
+        default=default_dest, metavar="<commit-ish>", \
+        help="Commit ending the patch stack. Default '%s'." % default_dest)
+    oprs.add_option("-p", "--patchdir", type="string", dest="patchdir", \
+        default=default_patchdir, metavar="<dir>", \
+        help="Directory where patches are stored. Default '%s'." \
+            % default_patchdir)
+    oprs.add_option("-x", "--exclude", action="append", type="string", \
+        dest="exclude", metavar="<shell-glob>", \
+        help="Exclude pattern fed to 'filterdiff -x'. You can specify\
+ more patterns by giving this option more than once.")
+    oprs.add_option("-s", "--series", action="store_true", dest="series", \
+        default=False,\
+        help="Write out a quilt type series file to patchdir.")
+    (opts, args) = oprs.parse_args()
+    if not os.path.isdir(opts.patchdir):
+        oprs.error("Output directory "+opts.patchdir+" not found.")
+    patchdir = opts.patchdir
     patchdir = patchdir + "/"
-
-    checkref(base)
-    checkref(intg)
+    base = opts.base
+    dest = opts.dest
+    series = opts.series
+    exlist = opts.exclude
+    if not iscommit(base):
+        oprs.error("'" + base + "' is not a valid commit")
+    if not iscommit(dest):
+        oprs.error("'" + dest + "' is not a valid commit")
 
     allrefs = getrefs()
     frefs = []
@@ -117,7 +93,7 @@ def main():
         elif iscommit(name):
             frefs.append(name)
         else:
-            usage(1, "Could not match '" + name + "' to a ref.")
+            oprs.error("Could not match '"+name+"' to a ref.")
     frefs = sorted(list(set(frefs)))
     npatches = len(frefs)
 
@@ -182,13 +158,13 @@ def main():
 
     patchnames.append(("%02d_" % pno) + "rest" + ".patch")
 
-    gitdiff("HEAD", intg, patchdir + patchnames[pno-1], exlist)
+    gitdiff("HEAD", dest, patchdir + patchnames[pno-1], exlist)
     cmd = "git apply --index " + patchdir + patchnames[pno-1]
     frob(cmd)
     cmd = "git commit -m 'Rest patch applied'"
     frob(cmd)
 
-    cmd = "git diff HEAD.." + intg + " | filterdiff | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "") + " | wc -l"
+    cmd = "git diff HEAD.." + dest + " | filterdiff | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "") + " | wc -l"
     status = frob(cmd)
     print "diff exit code: " + str(status)
     #if status > 255:
@@ -201,7 +177,7 @@ def main():
             f.write(p + "\n")
         f.close()
 
-    cmd = "git checkout " + intg
+    cmd = "git checkout " + dest
     frob(cmd)
     cmd = "git branch -D " + tmpbranch
     frob(cmd)
