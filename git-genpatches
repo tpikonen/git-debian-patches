@@ -12,9 +12,11 @@ of feature branches."""
 usage="%prog [options] <commit-ish> ... "
 
 
-def frob(cmd):
-    print cmd
-    return os.system(cmd)
+def frob(cmd, debug=True):
+    if debug:
+        print(cmd)
+    subprocess.check_call(cmd, shell=True)
+    return None
 
 
 def getrefs():
@@ -174,11 +176,11 @@ def main():
     frob(cmd)
 
     cmd = "git diff HEAD.." + dest + " | filterdiff | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "") + " | wc -l"
-    status = frob(cmd)
-    print "diff exit code: " + str(status)
+    frob(cmd)
+#    status = frob(cmd)
+#    print "diff exit code: " + str(status)
     #if status > 255:
 #    print "Found differences not representable in the final patch, exiting."
-#    sys.exit(1)
 
     if series:
         f = open(patchdir + "series", "w")
