@@ -43,10 +43,11 @@ def iscommit(name):
 
 
 def gitdiff(b1, b2, pname, exlist):
-    ex = ""
-    if exlist:
-        ex = " | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "")
-    cmd = "git diff "+ b1 + ".." + b2 + " | filterdiff" + ex + " > " + pname
+    # 'git diff' has no -x option and I want to cry.
+    filescmd="(git ls-tree -r --name-only %s ; git ls-tree -r --name-only %s) | sort | uniq" % (b1, b2)
+    grep_pattern = "-e '"+"' -e '".join(exlist)+"'"
+    # pattern '(?!x)x' always matches.
+    cmd = "git diff -p --stat "+b1+".."+b2+" -- `"+filescmd+" | grep -v --regexp='(?!x)x' "+grep_pattern+"` > "+pname
     return frob(cmd)
 
 
@@ -79,9 +80,9 @@ def main():
         help="Directory where patches are stored. Default '%s'." \
             % default_patchdir)
     oprs.add_option("-x", "--exclude", action="append", type="string", \
-        dest="exclude", metavar="<shell-glob>", \
-        help="Exclude pattern fed to 'filterdiff -x'. You can specify\
- more patterns by giving this option more than once.")
+        dest="exclude", metavar="<regexp>", \
+        help="Files matching this regexp will be filtered out from generated\
+ patches. You can give this option more than once.")
     oprs.add_option("-s", "--series", action="store_true", dest="series", \
         default=False,\
         help="Write out a quilt type series file to patchdir.")
