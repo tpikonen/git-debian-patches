@@ -92,12 +92,11 @@ def main():
     (opts, args) = oprs.parse_args()
     if not os.path.isdir(opts.patchdir):
         oprs.error("Output directory "+opts.patchdir+" not found.")
-    patchdir = opts.patchdir
-    patchdir = patchdir + "/"
+    patchdir = opts.patchdir + "/"
     base = opts.base
     dest = opts.dest
     series = opts.series
-    exlist = opts.exclude
+
     if not iscommit(base):
         oprs.error("'" + base + "' is not a valid commit")
     if not iscommit(dest):
@@ -133,7 +132,7 @@ def main():
     revpatches = [];
     if npatches > 0:
         fpatches.append(os.tempnam())
-        gitdiff(base, frefs[0], fpatches[0], exlist)
+        gitdiff(base, frefs[0], fpatches[0], opts.exclude)
         cmd = "git apply --index " + fpatches[0]
         frob(cmd)
         cmd = "git commit -m '0'"
@@ -141,8 +140,8 @@ def main():
     currstate = os.tempnam()
     for i in range(1,npatches):
         fpatches.append(os.tempnam())
-        gitdiff(base, frefs[i], fpatches[i], exlist)
-        gitdiff(base, tmpbranch, currstate, exlist)
+        gitdiff(base, frefs[i], fpatches[i], opts.exclude)
+        gitdiff(base, tmpbranch, currstate, opts.exclude)
         tname = os.tempnam()
         cmd = "minrevert -o " + tname + " " + currstate + " " + fpatches[i]
         frob(cmd)
@@ -170,8 +169,6 @@ def main():
 #    os.makedirs(tmpdir)
 #    tmpdir = tmpdir + "/"
 
-    pno = 1
-    patchnames = []
     def append(srcname, dstname):
         with open(srcname, 'r') as fsrc:
             with open(dstname, 'a') as fdst:
@@ -190,6 +187,8 @@ def main():
         patchnames.append(pname)
         shutil.move(revpatches[i], patchdir + pname)
 
+    pno = 1
+    patchnames = []
     if npatches > 0:
         movefeat(0, pno, metafiles[0])
     pno = pno+1
@@ -202,8 +201,8 @@ def main():
 
     patchnames.append(("%02d_" % pno) + "RESOLUTION" + ".patch")
 
-    gitdiff("HEAD", dest, patchdir + patchnames[pno-1], exlist)
-    cmd = "git apply --index " + patchdir + patchnames[pno-1]
+    gitdiff("HEAD", dest, patchdir + patchnames[-1], opts.exclude)
+    cmd = "git apply --index " + patchdir + patchnames[-1]
     frob(cmd)
     cmd = "git commit -m 'Rest patch applied'"
     frob(cmd)
