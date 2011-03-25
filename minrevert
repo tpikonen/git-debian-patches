@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+"""Create a patch reverting another patch partially.
+
+Usage: %(program)s [-o outpatch] patch_a patch_b
+
+If patch_a and patch_b are two diffs which independently apply cleanly to a
+source tree, %(program)s outputs a minimal patch outpatch such that a stack of
+patch_a, outpatch and patch_b applies cleanly to the original source tree.  """
+
+# Author: Teemu Ikonen <tpikonen@gmail.com>
+# This program is in public domain
+
+import getopt, sys, os, subprocess
+
+program = sys.argv[0]
+
+
+def usage(code, msg=''):
+    print >> sys.stderr, __doc__ % globals()
+    if msg:
+        print >> sys.stderr, msg
+    sys.exit(code)
+
+
+def gethunks(filename, patchname):
+    """Return a list of hunk range tuples."""
+    def tuplify(x):
+        if x == []:
+            return []
+        else:
+            return [(x[0], x[0]+x[1])] + tuplify(x[2:])
+    cmd = "filterdiff -i " + filename + " " + patchname + \
+    r''' | sed -ne 's/^@@ *-\([0-9]*\),\([0-9]*\) +.*@@.*/\1\n\2/p' '''
+    f = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+    hunks = tuplify([int(l) for l in f.readlines()])
+    f.close()
+    return hunks
+
+
+def get_conflicts(inhunks, fihunks):
+    """Return indices of ranges in `inhunks` overlapping w. ranges in `fihunks`.
+    """
+    i = -1
+    fip = 0
+    conflicts = []
+    for hunk in inhunks:
+        i = i+1
+        nextin = False
+        while(not nextin):
+            if fip >= len(fihunks):
+                break
+            fihunk = fihunks[fip]
+            # hunk before fihunk
+            if hunk[1] < fihunk[0]:
+                nextin = True
+            # overlap
+            elif (hunk[1] >= fihunk[0] and hunk[1] <= fihunk[1]) \
+              or (hunk[0] >= fihunk[0] and hunk[0] <= fihunk[1]) \
+              or (hunk[0] <= fihunk[0] and hunk[1] >= fihunk[1]) :
+                conflicts.append(i)
+                nextin = True
+            # hunk after fihunk
+            elif hunk[0] > fihunk[1]:
+                fip = fip+1
+    return conflicts
+
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "ho:", ["help", "output="])
+    except getopt.GetoptError, err:
+        usage(2, err.msg)
+    outfile = os.fdopen(os.dup(sys.stdout.fileno()))
+    verbose = False
+    for o, a in opts:
+        if o in ("-h", "--help"):
+            usage(0)
+        elif o in ("-o", "--output"):
+            try:
+                if not a == "-":
+                    outfile = open(a, "w")
+            except:
+                print "Could not open output file ", a
+                sys.exit(1)
+        else:
+            assert False, "unhandled option"
+    if len(args) != 2:
+        usage(0)
+
+    inpatch = args[0]
+    fipatch = args[1]
+    f = subprocess.Popen("lsdiff " + fipatch, \
+                         shell=True, stdout=subprocess.PIPE).stdout
+    filelist = [file.strip() for file in f.readlines()]
+    f.close()
+    for el in filelist:
+        inhunks = gethunks(el, inpatch)
+        fihunks = gethunks(el, fipatch)
+        confhunks = get_conflicts(inhunks, fihunks)
+        confstr = ""
+        for n in confhunks:
+            confstr = confstr + str(n+1) + ","
+        confstr = confstr[0:len(confstr)-1]
+        if len(confstr) > 0:
+            cmd = "filterdiff -i " + el + " --hunks=" + confstr + " " + inpatch
+            cmd = cmd + " | interdiff /dev/stdin /dev/null"
+            subprocess.Popen(cmd, shell=True, stdout=outfile).wait()
+            outfile.flush()
+    outfile.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,230 @@
+#!/usr/bin/env python
+# Author: Teemu Ikonen <tpikonen@gmail.com>
+# This program is in public domain
+
+import os, sys, shutil, subprocess, fnmatch, re
+from optparse import OptionParser
+
+description="""\
+Create a series of patches to take a branch to another through a number
+of feature branches."""
+
+usage="%prog [options] <commit-ish> ... "
+
+
+def frob(cmd, debug=True):
+    if debug:
+        print(cmd)
+    subprocess.check_call(cmd, shell=True)
+    return None
+
+
+def getrefs():
+    cmd = r"git show-ref | sed -e 's,.*refs/[^ /]*/\([^ ]*\).*,\1,'"
+    print cmd
+    f = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+    refs = [line.strip() for line in f.readlines() ]
+    f.close()
+    return refs
+
+
+def iscommit(name):
+    if len(name) == 0:
+        return False
+    cmd = "git name-rev " + name
+    print cmd
+    f = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+    output = f.readline()
+    f.close()
+    if len(output) > 0:
+        return True
+    else:
+        return False
+
+
+def gitdiff(b1, b2, pname, exlist):
+    # 'git diff' has no -x option and I want to cry.
+    filescmd="(git ls-tree -r --name-only %s ; git ls-tree -r --name-only %s) | sort | uniq" % (b1, b2)
+    grep_pattern = "-e '"+"' -e '".join(exlist)+"'"
+    # pattern '(?!x)x' always matches.
+    cmd = "git diff -p --stat "+b1+".."+b2+" -- `"+filescmd+" | grep -v --regexp='(?!x)x' "+grep_pattern+"` > "+pname
+    return frob(cmd)
+
+
+def get_metadata(metadir):
+    allfiles = os.listdir(metadir)
+    branches = []
+    metafiles = []
+    for fname in allfiles:
+        with open(metadir + '/' + fname) as ff:
+            match = re.search("^X-git-branch: *(.*)$", ff.read(), re.MULTILINE)
+        if match:
+            branches.append(match.group(1))
+            metafiles.append(metadir+'/'+fname)
+    return metafiles, branches
+
+
+def main():
+    default_base = "upstream"
+    default_dest = "master"
+    default_patchdir = "debian/patches/"
+    oprs = OptionParser(usage=usage, description=description)
+    oprs.add_option("-b", "--base", type="string", dest="base", \
+        default=default_base, metavar="<commit-ish>", \
+        help="Commit to base the patches to. Default '%s'." % default_base)
+    oprs.add_option("-d", "--dest", type="string", dest="dest", \
+        default=default_dest, metavar="<commit-ish>", \
+        help="Commit ending the patch stack. Default '%s'." % default_dest)
+    oprs.add_option("-p", "--patchdir", type="string", dest="patchdir", \
+        default=default_patchdir, metavar="<dir>", \
+        help="Directory where patches are stored. Default '%s'." \
+            % default_patchdir)
+    oprs.add_option("-x", "--exclude", action="append", type="string", \
+        dest="exclude", metavar="<regexp>", \
+        help="Files matching this regexp will be filtered out from generated\
+ patches. You can give this option more than once.")
+    oprs.add_option("-s", "--series", action="store_true", dest="series", \
+        default=False,\
+        help="Write out a quilt type series file to patchdir.")
+    oprs.add_option("-m", "--metadir", type="string", dest="metadir", \
+        default=None, \
+        help="Get branch names from metapatches in this directory.")
+    (opts, args) = oprs.parse_args()
+    if not os.path.isdir(opts.patchdir):
+        oprs.error("Output directory "+opts.patchdir+" not found.")
+    patchdir = opts.patchdir + "/"
+    base = opts.base
+    dest = opts.dest
+    series = opts.series
+
+    if not iscommit(base):
+        oprs.error("'" + base + "' is not a valid commit")
+    if not iscommit(dest):
+        oprs.error("'" + dest + "' is not a valid commit")
+    if opts.metadir:
+        metafiles, branchnames = get_metadata(opts.metadir)
+    else:
+        branchnames = args
+        metafiles = [ None for b in branchnames ]
+
+    allrefs = getrefs()
+    frefs = []
+    for name in branchnames:
+        l = fnmatch.filter(allrefs, name) # FIXME: Use git rev-parse?
+        if l:
+            frefs = frefs + l
+        elif iscommit(name):
+            frefs.append(name)
+        else:
+            oprs.error("Could not match '"+name+"' to a ref.")
+    if len(frefs) != len(set(frefs)):
+        oprs.error("Repeated patch branches given")
+    npatches = len(frefs)
+
+    cmd = 'git stash save "Local changes saved by git-genpatches"'
+    frob(cmd)
+
+    tmpbranch = os.path.basename(os.tempnam())
+    cmd = "git checkout -b " + tmpbranch + " " + base
+    frob(cmd)
+
+    fpatches = []
+    revpatches = [];
+    if npatches > 0:
+        fpatches.append(os.tempnam())
+        gitdiff(base, frefs[0], fpatches[0], opts.exclude)
+        cmd = "git apply --index " + fpatches[0]
+        frob(cmd)
+        cmd = "git commit -m '0'"
+        frob(cmd)
+    currstate = os.tempnam()
+    for i in range(1,npatches):
+        fpatches.append(os.tempnam())
+        gitdiff(base, frefs[i], fpatches[i], opts.exclude)
+        gitdiff(base, tmpbranch, currstate, opts.exclude)
+        tname = os.tempnam()
+        cmd = "minrevert -o " + tname + " " + currstate + " " + fpatches[i]
+        frob(cmd)
+        try:
+            s = os.stat(tname)
+            if s.st_size > 0:
+                revpatches.append(tname)
+                cmd = "git apply --index " + tname
+                frob(cmd)
+                cmd = "git commit -m 'minrevert'"
+                frob(cmd)
+            else:
+                revpatches.append("")
+                os.remove(tname)
+        except:
+            revpatches.append("")
+        cmd = "git apply --index " + fpatches[i]
+        frob(cmd)
+        cmd = "git commit -m '%d'" % i
+        frob(cmd)
+
+    #print fpatches
+    #print revpatches
+#    tmpdir = os.tempnam()
+#    os.makedirs(tmpdir)
+#    tmpdir = tmpdir + "/"
+
+    def append(srcname, dstname):
+        with open(srcname, 'r') as fsrc:
+            with open(dstname, 'a') as fdst:
+                fdst.write('\n')
+                shutil.copyfileobj(fsrc, fdst)
+
+    def movefeat(i, n, metafile=None):
+        pname = "%02d_%s.patch" % (n, os.path.basename(frefs[i]))
+        patchnames.append(pname)
+        if metafile:
+            shutil.copy(metafile, patchdir + pname)
+        append(fpatches[i], patchdir + pname)
+
+    def moverev(i, n):
+        pname = "%02d_CONFLICTS_IN_%s.patch"%(n, os.path.basename(frefs[i+1]))
+        patchnames.append(pname)
+        shutil.move(revpatches[i], patchdir + pname)
+
+    pno = 1
+    patchnames = []
+    if npatches > 0:
+        movefeat(0, pno, metafiles[0])
+    pno = pno+1
+    for i in range(1,npatches):
+        if len(revpatches[i-1]) > 0:
+            moverev(i-1, pno)
+            pno = pno+1
+        movefeat(i, pno, metafiles[i])
+        pno = pno+1
+
+    patchnames.append(("%02d_" % pno) + "RESOLUTION" + ".patch")
+
+    gitdiff("HEAD", dest, patchdir + patchnames[-1], opts.exclude)
+    cmd = "git apply --index " + patchdir + patchnames[-1]
+    frob(cmd)
+    cmd = "git commit -m 'Rest patch applied'"
+    frob(cmd)
+
+    cmd = "git diff HEAD.." + dest + " | filterdiff | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "") + " | wc -l"
+    frob(cmd)
+#    status = frob(cmd)
+#    print "diff exit code: " + str(status)
+    #if status > 255:
+#    print "Found differences not representable in the final patch, exiting."
+
+    if series:
+        f = open(patchdir + "series", "w")
+        for p in patchnames:
+            f.write(p + "\n")
+        f.close()
+
+    cmd = "git checkout " + dest
+    frob(cmd)
+    cmd = "git branch -D " + tmpbranch
+    frob(cmd)
+
+
+if __name__ == "__main__":
+    main()
