@@ -164,11 +164,15 @@ def main():
         cmd = "git commit -m '%d'" % i
         frob(cmd)
 
-    #print fpatches
-    #print revpatches
-#    tmpdir = os.tempnam()
-#    os.makedirs(tmpdir)
-#    tmpdir = tmpdir + "/"
+    restname = os.tempnam()
+    gitdiff("HEAD", dest, restname, opts.exclude)
+    cmd = "git apply --index " + restname
+    frob(cmd)
+    cmd = "git commit -m 'Rest patch applied'"
+    frob(cmd)
+
+    cmd = "git checkout " + dest
+    frob(cmd)
 
     def append(srcname, dstname):
         with open(srcname, 'r') as fsrc:
@@ -200,13 +204,8 @@ def main():
         movefeat(i, pno, metafiles[i])
         pno = pno+1
 
-    patchnames.append(("%02d_" % pno) + "RESOLUTION" + ".patch")
-
-    gitdiff("HEAD", dest, patchdir + patchnames[-1], opts.exclude)
-    cmd = "git apply --index " + patchdir + patchnames[-1]
-    frob(cmd)
-    cmd = "git commit -m 'Rest patch applied'"
-    frob(cmd)
+    patchnames.append(("%02d_" % pno) + "RESOLUTION.patch")
+    shutil.move(restname, patchdir + patchnames[-1])
 
     status = gitdiff("HEAD", dest, "/dev/null", opts.exclude, "--quiet")
     if status > 0:
@@ -218,8 +217,6 @@ def main():
             f.write(p + "\n")
         f.close()
 
-    cmd = "git checkout " + dest
-    frob(cmd)
     cmd = "git branch -D " + tmpbranch
     frob(cmd)
 
