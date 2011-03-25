@@ -42,13 +42,13 @@ def iscommit(name):
         return False
 
 
-def gitdiff(b1, b2, pname, exlist):
+def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat "):
     # 'git diff' has no -x option and I want to cry.
     filescmd="(git ls-tree -r --name-only %s ; git ls-tree -r --name-only %s) | sort | uniq" % (b1, b2)
     grep_pattern = "-e '"+"' -e '".join(exlist)+"'"
     # pattern '(?!x)x' always matches.
-    cmd = "git diff -p --stat "+b1+".."+b2+" -- `"+filescmd+" | grep -v --regexp='(?!x)x' "+grep_pattern+"` > "+pname
-    return frob(cmd)
+    cmd = "git diff "+diffargs+" "+b1+".."+b2+" -- `"+filescmd+" | grep -v --regexp='(?!x)x' "+grep_pattern+"` > "+pname
+    return subprocess.call(cmd, shell=True)
 
 
 def get_metadata(metadir):
@@ -208,12 +208,9 @@ def main():
     cmd = "git commit -m 'Rest patch applied'"
     frob(cmd)
 
-    cmd = "git diff HEAD.." + dest + " | filterdiff | filterdiff " + reduce(lambda x,y: x + " -x " + y, exlist, "") + " | wc -l"
-    frob(cmd)
-#    status = frob(cmd)
-#    print "diff exit code: " + str(status)
-    #if status > 255:
-#    print "Found differences not representable in the final patch, exiting."
+    status = gitdiff("HEAD", dest, "/dev/null", opts.exclude, "--quiet")
+    if status > 0:
+        print "Found differences not representable in the final patch!"
 
     if series:
         f = open(patchdir + "series", "w")
