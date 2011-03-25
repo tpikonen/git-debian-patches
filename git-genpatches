@@ -53,6 +53,7 @@ def gitdiff(b1, b2, pname, exlist):
 
 def get_metadata(metadir):
     allfiles = os.listdir(metadir)
+    allfiles.sort()
     branches = []
     metafiles = []
     for fname in allfiles:
