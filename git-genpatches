@@ -186,6 +186,7 @@ def main():
         if metafile:
             shutil.copy(metafile, patchdir + pname)
         append(fpatches[i], patchdir + pname)
+        os.remove(fpatches[i])
 
     def moverev(i, n):
         pname = "%02d_CONFLICTS_IN_%s.patch"%(n, os.path.basename(frefs[i+1]))
