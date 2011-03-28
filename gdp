@@ -9,30 +9,14 @@ pext=".patch"
 debbranch="master"
 upbranch="upstream"
 
-# Recreate patches from a git branch and metapatch files.
+
+# Recreate patches with git-genpatches.
 refresh ()
 {
     dh_testdir
     rm -f ${patchdir}/debian-changes-*
     rm -f $seriesfile
-    i=1
-    for metafile in ${metadir}/*
-    do
-        patchname=$(basename $metafile)
-        branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
-        outfile=${patchdir}/${patchname}${pext}
-        i=$(expr ${i} + 1)
-        rm -f ${outfile}
-        if git diff --quiet ${upbranch}..${branch} ; then
-            echo "$branch is empty."
-        else
-            cat $metafile > $outfile
-            echo "---" >> $outfile
-            git diff -p --stat ${upbranch}..${branch} >> $outfile
-            echo ${patchname}${pext} >> $seriesfile
-            printf "%-30s -> %s\n" $branch $outfile
-        fi
-    done
+    git-genpatches -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
 }
 
 
