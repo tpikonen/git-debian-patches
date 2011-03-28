@@ -164,8 +164,15 @@ def main():
         cmd = "git commit -m '%d'" % i
         frob(cmd)
 
+    gitdiff(base, tmpbranch, currstate, opts.exclude)
+    fullpatch = os.tempnam()
+    gitdiff(tmpbranch, dest, fullpatch, opts.exclude)
     restname = os.tempnam()
-    gitdiff("HEAD", dest, restname, opts.exclude)
+    cmd = "minrevert %s %s | interdiff /dev/stdin /dev/null | filterdiff > %s" \
+        % (fullpatch, currstate, restname)
+    frob(cmd)
+    os.remove(currstate)
+    os.remove(fullpatch)
     cmd = "git apply --index " + restname
     frob(cmd)
     cmd = "git commit -m 'Rest patch applied'"
