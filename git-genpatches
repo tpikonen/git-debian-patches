@@ -190,10 +190,12 @@ def main():
     frob(cmd)
     os.remove(currstate)
     os.remove(fullpatch)
-    cmd = "git apply --index " + restname
-    frob(cmd)
-    cmd = "git commit -m 'Rest patch applied'"
-    frob(cmd)
+    have_respatch = os.stat(restname).st_size > 0
+    if have_respatch:
+        cmd = "git apply --index " + restname
+        frob(cmd)
+        cmd = "git commit -m 'Rest patch applied'"
+        frob(cmd)
 
     cmd = "git checkout " + dest
     frob(cmd)
@@ -229,8 +231,11 @@ def main():
         movefeat(i, pno, metafiles[i])
         pno = pno+1
 
-    patchnames.append(("%02d_" % pno) + "RESOLUTION.patch")
-    shutil.move(restname, patchdir + patchnames[-1])
+    if have_respatch:
+        patchnames.append(("%02d_" % pno) + "RESOLUTION.patch")
+        shutil.move(restname, patchdir + patchnames[-1])
+    else:
+        os.remove(restname)
 
     status = gitdiff("HEAD", dest, "/dev/null", opts.exclude, "--quiet")
     if status > 0:
