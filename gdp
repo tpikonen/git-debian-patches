@@ -53,8 +53,10 @@ build ()
 # tag-heads [$VERSION]
 # Tag current git branch heads with the (debian) version.
 # If $VERSION is not given, get it from debian/changelog.
-# Tag for the debian branch (usually 'master') has the name debian/$VERSION,
-# patch branch tags are tagged with the name $PATCHBRANCH/$VERSION
+# Tag for the debian branch (usually 'master') has the name $VERSION/debian,
+# upstream branch tag has the name $VERSION/upstream and the patch branch
+# tags are named $VERSION/$PATCHBRANCH. Additionally, the debian branch is
+# tagged with debian/$VERSION to be compatible with git-buildpackage.
 tagheads ()
 {
     dh_testdir
@@ -63,12 +65,16 @@ tagheads ()
     if [ -z ${version} ] && [ "${version+xxx}" = "xxx" ] ; then
         version=$(dpkg-parsechangelog | sed -n 's/^Version: \(.*\)$/\1/p')
     fi
+    echo "Tagging ${debbranch} with ${version}/${debbranch}"
+    git tag ${version}/${debbranch} ${debbranch}
+    echo "Tagging ${upbranch} with ${version}/${upbranch}"
+    git tag ${version}/${upbranch} ${upbranch}
     i=1
     for metafile in ${metadir}/*
     do
         branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
-        echo "Tagging ${branch} with ${branch}/${version}"
-        git tag ${branch}/${version} ${branch}
+        echo "Tagging ${branch} with ${version}/${branch}"
+        git tag ${version}/${branch} ${branch}
     done
     echo "Tagging ${debbranch} with debian/${version}"
     git tag debian/${version} ${debbranch}
