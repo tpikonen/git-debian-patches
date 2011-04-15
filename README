@@ -1,0 +1,30 @@
+How to update Debian sources with a new upstream version
+========================================================
+
+1. Update the 'upstream' and 'pristine-tar' branches with the 'git import-orig'
+command from git-buildpackage.
+git import-orig --no-merge --pristine-tar ../upstream_ver.orig.tar.gz
+
+2. Merge the updated 'upstream' branch to all of the patch ('p/*') branches.
+Resolve conflicts with git mergetool or by hand.
+git co p/makefile ; git merge upstream ; git mergetool ; git commit
+
+3. Do an octopus merge of all the patch branches to a temporary branch,
+let's call it 'temp'. Resolve conflicts.
+git co -b temp p/makefile
+
+4. Store the state of the 'temp' branch to the master branch. The conflicts
+are already resolved in the 'temp' branch, so the merge strategy should be
+'theirs'. Do not commit the merge yet.
+git co master; git merge --squash -s recursive -X theirs temp
+
+5. Manipulate the merge information, so that the merge looks like it has
+been made from upstream to master:
+git rev-parse upstream > .git/MERGE_HEAD
+echo "Merge from 'upstream' branch" > .git/MERGE_MSG
+
+6. Commit the merge:
+git commit
+
+7. Delete the 'temp' branch.
+git branch -D temp
