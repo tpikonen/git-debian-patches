@@ -28,6 +28,7 @@ prefix="p/"
 pext=".patch"
 debbranch="master"
 upbranch="upstream"
+pristbranch="pristine-tar"
 
 
 # Recreate patches with git-genpatches.
@@ -72,6 +73,12 @@ tagheads ()
     git tag ${version}/${debbranch} ${debbranch}
     echo "Tagging ${upbranch} with ${version}/${upbranch}"
     git tag ${version}/${upbranch} ${upbranch}
+    if git rev-parse --verify -q ${pristbranch} ; then
+        echo "Tagging ${pristbranch} with ${version}/${pristbranch}"
+        git tag ${version}/${pristbranch} ${pristbranch}
+    else
+        echo "No '${pristbranch}' branch found."
+    fi
     i=1
     for metafile in ${metadir}/*
     do
