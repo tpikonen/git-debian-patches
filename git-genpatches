@@ -233,9 +233,11 @@ def main():
 
     if have_respatch:
         patchnames.append(("%02d_" % pno) + "RESOLUTION.patch")
-        shutil.move(restname, patchdir + patchnames[-1])
-    else:
-        os.remove(restname)
+        with open(patchdir + patchnames[-1], 'w') as ff:
+            ff.write("Resolve patch overlaps.\n")
+            with open(restname, 'r') as fp:
+                shutil.copyfileobj(fp, ff)
+    os.remove(restname)
 
     status = gitdiff("HEAD", dest, "/dev/null", opts.exclude, "--quiet")
     if status > 0:
