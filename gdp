@@ -171,6 +171,8 @@ case $1 in
         shift ; importorig $@ ;;
     new-patch)
         shift ; newpatch $@ ;;
+    newpatch)
+        shift ; newpatch $@ ;;
     pick)
         shift ; pick $@ ;;
     *)
