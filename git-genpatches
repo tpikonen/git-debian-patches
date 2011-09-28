@@ -71,12 +71,14 @@ def temp_branchname():
     return bname
 
 
-def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat "):
+def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat ", debug=True):
     # 'git diff' has no -x option and I want to cry.
     filescmd="(git ls-tree -r --name-only %s ; git ls-tree -r --name-only %s) | sort | uniq" % (b1, b2)
     grep_pattern = "-e '"+"' -e '".join(exlist)+"'"
     # pattern '(?!x)x' always matches.
     cmd = "git diff "+diffargs+" "+b1+".."+b2+" -- `"+filescmd+" | grep -v --regexp='(?!x)x' "+grep_pattern+"` > "+pname
+    if debug:
+        print(cmd)
     return subprocess.call(cmd, shell=True)
 
 
