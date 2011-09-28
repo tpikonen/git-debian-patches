@@ -82,6 +82,15 @@ def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat ", debug=True):
     return subprocess.call(cmd, shell=True)
 
 
+def is_okdiff(fname, branchname):
+    s = os.stat(fname)
+    if s.st_size > 0:
+        return True
+    else:
+        print('\n\n\n   Branch %s is empty!\n\n\n' % branchname)
+        return False
+
+
 def get_metadata(metadir):
     allfiles = os.listdir(metadir)
     allfiles.sort()
@@ -167,14 +176,18 @@ def main():
     if npatches > 0:
         fpatches.append(os.tempnam())
         gitdiff(base, frefs[0], fpatches[0], opts.exclude)
-        cmd = "git apply --index " + fpatches[0]
-        frob(cmd)
-        cmd = "git commit -m '0'"
-        frob(cmd)
+        if is_okdiff(fpatches[0], frefs[0]):
+            cmd = "git apply --index " + fpatches[0]
+            frob(cmd)
+            cmd = "git commit -m '0'"
+            frob(cmd)
     currstate = os.tempnam()
     for i in range(1,npatches):
         fpatches.append(os.tempnam())
         gitdiff(base, frefs[i], fpatches[i], opts.exclude)
+        if not is_okdiff(fpatches[i], frefs[i]):
+            revpatches.append("")
+            continue
         gitdiff(base, tmpbranch, currstate, opts.exclude)
         tname = os.tempnam()
         cmd = "minrevert -o " + tname + " " + currstate + " " + fpatches[i]
