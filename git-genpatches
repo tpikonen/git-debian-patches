@@ -59,6 +59,18 @@ def iscommit(name):
         return False
 
 
+def temp_branchname():
+    """Return a temporary branchname which does not exist."""
+    def randstr(N):
+        return ''.join(random.choice(string.ascii_lowercase + string.digits)
+            for i in xrange(N))
+
+    bname = 'branch_' + randstr(6)
+    while(iscommit(bname)):
+        bname = 'branch_' + randstr(6)
+    return bname
+
+
 def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat "):
     # 'git diff' has no -x option and I want to cry.
     filescmd="(git ls-tree -r --name-only %s ; git ls-tree -r --name-only %s) | sort | uniq" % (b1, b2)
@@ -144,7 +156,7 @@ def main():
     cmd = 'git stash save "Local changes saved by git-genpatches"'
     frob(cmd)
 
-    tmpbranch = os.path.basename(os.tempnam())
+    tmpbranch = temp_branchname()
     cmd = "git checkout -b " + tmpbranch + " " + base
     frob(cmd)
 
