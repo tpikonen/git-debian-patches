@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import os, sys, shutil, subprocess, fnmatch, re
+import os, sys, shutil, subprocess, fnmatch, re, random, string, warnings
 from optparse import OptionParser
 
 description="""\
@@ -114,6 +114,8 @@ def main():
     base = opts.base
     dest = opts.dest
     series = opts.series
+
+    warnings.filterwarnings("ignore", "tempnam")
 
     if not iscommit(base):
         oprs.error("'" + base + "' is not a valid commit")
