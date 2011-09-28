@@ -127,7 +127,7 @@ def main():
         default=default_patchdir, metavar="<dir>", \
         help="Directory where patches are stored. Default '%s'." \
             % default_patchdir)
-    oprs.add_option("-x", "--exclude", action="append", type="string", \
+    oprs.add_option("-x", "--exclude", action="append", default=[], \
         dest="exclude", metavar="<regexp>", \
         help="Files matching this regexp will be filtered out from generated\
  patches. You can give this option more than once.")
@@ -166,7 +166,9 @@ def main():
         metafiles = [ None for b in branchnames ]
     logging.info("Creating patches for branches: %s" % ' '.join(branchnames))
     logging.info("Writing patches to: %s" % patchdir)
-    map(lambda s: logging.info("Excluding files matching: %s" % s), opts.exclude)
+    if opts.exclude:
+        map(lambda s: logging.info("Excluding files matching: %s" % s),
+            opts.exclude)
 
     allrefs = getrefs()
     frefs = []
