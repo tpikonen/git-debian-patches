@@ -188,13 +188,14 @@ def main():
     frob(cmd)
 
     tmpbranch = temp_branchname()
+    logging.info("Using temporary branch %s" % tmpbranch)
     cmd = "git checkout -b " + tmpbranch + " " + base
     frob(cmd)
-    logging.info("Using temporary branch %s" % tmpbranch)
 
     fpatches = []
     revpatches = [];
     if npatches > 0:
+        logging.info("Processing branch %s" % frefs[0])
         fpatches.append(os.tempnam())
         gitdiff(base, frefs[0], fpatches[0], opts.exclude)
         if is_okdiff(fpatches[0], frefs[0]):
@@ -202,15 +203,14 @@ def main():
             frob(cmd)
             cmd = "git commit -m '0'"
             frob(cmd)
-            logging.info("Processing branch %s" % frefs[0])
     currstate = os.tempnam()
     for i in range(1,npatches):
+        logging.info("Processing branch %s" % frefs[i])
         fpatches.append(os.tempnam())
         gitdiff(base, frefs[i], fpatches[i], opts.exclude)
         if not is_okdiff(fpatches[i], frefs[i]):
             revpatches.append("")
             continue
-        logging.info("Processing branch %s" % frefs[i])
         gitdiff(base, tmpbranch, currstate, opts.exclude)
         tname = os.tempnam()
         cmd = "minrevert -o " + tname + " " + currstate + " " + fpatches[i]
@@ -218,12 +218,12 @@ def main():
         try:
             s = os.stat(tname)
             if s.st_size > 0:
+                logging.info("    Revert patch needed")
                 revpatches.append(tname)
                 cmd = "git apply --index " + tname
                 frob(cmd)
                 cmd = "git commit -m 'minrevert'"
                 frob(cmd)
-                logging.info("    Revert patch needed")
             else:
                 revpatches.append("")
                 os.remove(tname)
@@ -245,11 +245,11 @@ def main():
     os.remove(fullpatch)
     have_respatch = os.stat(restname).st_size > 0
     if have_respatch:
+        logging.info("Creating a resolution patch.")
         cmd = "git apply --index " + restname
         frob(cmd)
         cmd = "git commit -m 'Rest patch applied'"
         frob(cmd)
-        logging.info("Creating a resolution patch.")
 
     cmd = "git checkout " + dest
     frob(cmd)
