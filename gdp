@@ -36,10 +36,6 @@ refresh ()
 {
     dh_testdir
     rm -f ${patchdir}/debian-changes-*
-    cat $seriesfile | while read pfile ; do
-        rm -f ${patchdir}/${pfile}
-    done
-    rm -f $seriesfile
     git-genpatches -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
 }
 
