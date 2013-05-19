@@ -105,6 +105,7 @@ newpatch ()
 {
     dh_testdir
     patchname=$1
+    pnum_width=2 # Number of characters in metapatch number
     if [ ${#patchname} -lt 1 ] ; then
         echo "You must give a patch name."
         exit 1
@@ -117,12 +118,15 @@ newpatch ()
         mkdir -p $metadir
     fi
     npatches=$(ls $metadir | wc -l)
-    pnum=$(expr $npatches + 1)
-    echo "You have $npatches patches."
+    echo "You have currently $npatches patches."
+    lastpatch=$(ls ${metadir} | tail -n 1)
+    lastnum=$(echo ${lastpatch} | head -c ${pnum_width})
+    echo "Last metapatch is ${lastpatch} with number ${lastnum}"
+    pnum=$(expr ${lastnum} + 1)
     branchname=${prefix}${patchname}
     echo "Creating a new branch $branchname ..."
     git branch $branchname $upbranch
-    metaname=$(printf "%s/%02d_%s" $metadir $pnum $patchname)
+    metaname=$(printf "%s/%0${pnum_width}d_%s" $metadir $pnum $patchname)
     echo "Creating metapatch $metaname ..."
     cat > $metaname << EOF_really
 From: $DEBFULLNAME <$DEBEMAIL>
