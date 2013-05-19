@@ -254,6 +254,18 @@ def main():
     cmd = "git checkout " + dest
     frob(cmd)
 
+    seriesfile = patchdir + "series"
+    if os.path.isfile(seriesfile):
+        logging.info("Removing files from previous seriesfile %s" % seriesfile)
+        with open(patchdir + "series") as fs:
+            for line in fs:
+                try:
+                    filename = patchdir + line.rstrip()
+                    os.remove(filename)
+                except OSError:
+                    logging.debug("File '%s' does not exist." % filename)
+                    pass
+
     def append(srcname, dstname):
         with open(srcname, 'r') as fsrc:
             with open(dstname, 'a') as fdst:
