@@ -69,7 +69,7 @@ tagheads ()
     git tag ${version}/${debbranch} ${debbranch}
     echo "Tagging ${upbranch} with ${version}/${upbranch}"
     git tag ${version}/${upbranch} ${upbranch}
-    if git rev-parse --verify -q ${pristbranch} ; then
+    if git rev-parse --verify -q ${pristbranch} > /dev/null ; then
         echo "Tagging ${pristbranch} with ${version}/${pristbranch}"
         git tag ${version}/${pristbranch} ${pristbranch}
     else
