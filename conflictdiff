@@ -114,18 +114,11 @@ getconflicts() {
 # get_comms "$patch1" "$patch2"
 # lsdiff both patches and print common files.
 get_comms() {
-    had_common=true
+    local fst snd
+    fst=""
     while read snd; do
-        if $had_common ; then
-            fst="$snd"
-            read fst
-            had_common=false
-        fi
-        echo "fst: $fst" >&2
-        echo "snd: $snd">&2
         if [ "$fst" = "$snd" ] ; then
             echo "$fst"
-            had_common=true
         fi
         fst="$snd"
     done <<< "$((lsdiff "$1" ; lsdiff "$2") | sort)"
@@ -136,7 +129,7 @@ outfile="/dev/stdout"
 while [ $# -gt 0 ] ; do
     PAR=$1
     case $PAR in
-        -o) # Output file
+        -o)
             outfile=$2
             shift
             ;;
@@ -163,20 +156,21 @@ inpatch=$1
 fipatch=$2
 
 filelist=$(get_comms "${inpatch}" "${fipatch}")
-echo "files: $filelist"
+echo -n "" > $outfile
+#echo "files: $filelist"
 for el in ${filelist}
 do
-    echo "file: $el"
+    echo "file: $el" >&2
     inhunks=$(gethunks "${el}" "${inpatch}")
-    echo "---"
-    echo "$inhunks"
+    #echo "---"
+    #echo "$inhunks"
     fihunks=$(gethunks "${el}" "${fipatch}")
-    echo "---"
-    echo "$fihunks"
-    echo "---"
+    #echo "---"
+    #echo "$fihunks"
+    #echo "---"
     confhunks=$(getconflicts "${inhunks}" "${fihunks}")
-    echo "confhunks: |$confhunks|" >&2
+    #echo "confhunks: |$confhunks|" >&2
     if [ ${#confhunks} -gt 0 ] ; then
-        filterdiff -i "$el" --hunks="$confhunks" "$inpatch" > "$outfile"
+        filterdiff -i "$el" --hunks="$confhunks" "$inpatch" >> "$outfile"
     fi
 done
