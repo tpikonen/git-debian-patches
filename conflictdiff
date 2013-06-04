@@ -1,0 +1,182 @@
+#!/bin/bash
+# Copyright (C) 2013 by Teemu Ikonen <tpikonen@gmail.com>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+# Requires Bash4
+
+set -e
+
+usage() {
+cat <<EODOC >&2
+$0 [-o output] patch_a patch_b
+
+Create a patch reverting another patch partially.
+If patch_a and patch_b are two diffs which independently apply cleanly to a
+source tree, output a minimal patch outpatch such that a stack of
+patch_a, outpatch and patch_b applies cleanly to the original source tree.
+
+EODOC
+}
+
+
+# gethunks $filename $patchname
+# Get hunk ranges which apply to source file $filename from $patchname
+gethunks() {
+    local filename patchname
+    filename="$1"
+    patchname="$2"
+    local hunkstr a b
+    hunkstr=$(filterdiff -i ${filename} ${patchname} | sed -ne 's/^@@ *-\([0-9]*\),\([0-9]*\) +.*@@.*/\1 \2/p')
+    i=0
+    IFS=$'\n'
+    for line in ${hunkstr}
+    do
+        IFS=' '
+        read a b <<< "$line"
+        echo "$a $((a+b))"
+        IFS=$'\n'
+    done
+    unset IFS
+}
+
+
+# getconflicts "$inhunks" "$fihunks"
+# Return index string (e.g. "1,3,5") to range lines in `inhunks` which overlap
+# with ranges in `fihunks`.
+getconflicts() {
+    local inhunks fihunks
+    inhunks=$1
+    fihunks=$2
+    local inbeg inend fibeg fiend conflicts index nextfihunk
+    conflicts=""
+    index=0
+    nextfihunk=true
+    IFS=$'\n'
+    for line in ${inhunks}
+    do
+        index=$((index+1))
+        IFS=' '
+        read inbeg inend <<< "$line"
+        if $nextfihunk ; then # this condition is true only in 1st iteration
+            IFS=' '
+            read fibeg fiend # input is read from $fihunks
+            nextfihunk=false
+        fi
+#        echo "inbeg,inend: |$inbeg|$inend|"
+        while true ; do
+            if $nextfihunk ; then
+                IFS=' '
+                # input is read from $fihunks, if it fails, exit for-loop
+                read fibeg fiend || break 2
+                nextfihunk=false
+            fi
+#            echo "fibeg,fiend: |$fibeg|$fiend|"
+            # There are 3 possibilities:
+            # 1: inhunk before fihunk, read next inhunk
+            if test $inend -lt $fibeg ; then
+                break
+            # 2: overlap, mark as conflict, read next inhunk
+            elif [ $inend -ge $fibeg -a $inend -le $fiend \
+                -o $inbeg -ge $fibeg -a $inbeg -le $fiend \
+                -o $inbeg -le $fibeg -a $inend -ge $fiend ] ; then
+                conflicts="${conflicts}${index},"
+                break
+            # 3: inhunk after fihunk, read next fihunk
+            else
+                nextfihunk=true
+            fi
+        done
+        IFS=$'\n'
+    done <<< "${fihunks}"
+    unset IFS
+    conflicts=${conflicts%,*}
+    echo "$conflicts"
+}
+
+
+# get_comms "$patch1" "$patch2"
+# lsdiff both patches and print common files.
+get_comms() {
+    had_common=true
+    while read snd; do
+        if $had_common ; then
+            fst="$snd"
+            read fst
+            had_common=false
+        fi
+        echo "fst: $fst" >&2
+        echo "snd: $snd">&2
+        if [ "$fst" = "$snd" ] ; then
+            echo "$fst"
+            had_common=true
+        fi
+        fst="$snd"
+    done <<< "$((lsdiff "$1" ; lsdiff "$2") | sort)"
+}
+
+
+outfile="/dev/stdout"
+while [ $# -gt 0 ] ; do
+    PAR=$1
+    case $PAR in
+        -o) # Output file
+            outfile=$2
+            shift
+            ;;
+        -h) ;&
+        --help)
+            usage
+            exit 1
+            ;;
+        -*)
+            echo "Warning: Ignoring unknown parameter $PAR" >&2
+            ;;
+        *) # End of options
+            break 2 ;;
+    esac
+    shift
+done
+
+if [ $# != 2 ] ; then
+    echo "Two diff-files required as input." >&2
+    exit 1
+fi
+
+inpatch=$1
+fipatch=$2
+
+filelist=$(get_comms "${inpatch}" "${fipatch}")
+echo "files: $filelist"
+for el in ${filelist}
+do
+    echo "file: $el"
+    inhunks=$(gethunks "${el}" "${inpatch}")
+    echo "---"
+    echo "$inhunks"
+    fihunks=$(gethunks "${el}" "${fipatch}")
+    echo "---"
+    echo "$fihunks"
+    echo "---"
+    confhunks=$(getconflicts "${inhunks}" "${fihunks}")
+    echo "confhunks: |$confhunks|" >&2
+    if [ ${#confhunks} -gt 0 ] ; then
+        filterdiff -i "$el" --hunks="$confhunks" "$inpatch" > "$outfile"
+    fi
+done
