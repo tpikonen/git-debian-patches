@@ -126,6 +126,7 @@ get_comms() {
 
 
 outfile="/dev/stdout"
+patchcount=0
 while [ $# -gt 0 ] ; do
     PAR=$1
     case $PAR in
@@ -141,19 +142,28 @@ while [ $# -gt 0 ] ; do
         -*)
             echo "Warning: Ignoring unknown parameter $PAR" >&2
             ;;
-        *) # End of options
-            break 2 ;;
+        *)
+            case $patchcount in
+                0)
+                    inpatch="$PAR"
+                    ;;
+                1)
+                    fipatch="$PAR"
+                    ;;
+                *)
+                    echo "Error: Too many arguments."
+                    exit 1
+                    ;;
+            esac
+            patchcount=$((patchcount+1))
     esac
     shift
 done
 
-if [ $# != 2 ] ; then
+if [ $patchcount != 2 ] ; then
     echo "Two diff-files required as input." >&2
     exit 1
 fi
-
-inpatch=$1
-fipatch=$2
 
 filelist=$(get_comms "${inpatch}" "${fipatch}")
 echo -n "" > $outfile
