@@ -76,7 +76,7 @@ getconflicts() {
             read fibeg fiend # input is read from $fihunks
             nextfihunk=false
         fi
-#        echo "inbeg,inend: |$inbeg|$inend|"
+#        echo "inbeg,inend: |$inbeg|$inend|" >&2
         while true ; do
             if $nextfihunk ; then
                 IFS=' '
@@ -84,7 +84,7 @@ getconflicts() {
                 read fibeg fiend || break 2
                 nextfihunk=false
             fi
-#            echo "fibeg,fiend: |$fibeg|$fiend|"
+#            echo "fibeg,fiend: |$fibeg|$fiend|" >&2
             # There are 3 possibilities:
             # 1: inhunk before fihunk => read next inhunk
             if test $inend -lt $fibeg ; then
@@ -165,17 +165,17 @@ fi
 
 filelist=$(get_comms "${inpatch}" "${fipatch}")
 echo -n "" > $outfile
-#echo "files: $filelist"
+#echo "files: $filelist" >&2
 for el in ${filelist}
 do
-    echo "file: $el" >&2
+    #echo "file: $el" >&2
     inhunks=$(gethunks "${el}" "${inpatch}")
-    #echo "---"
-    #echo "$inhunks"
+    #echo "---" >&2
+    #echo "$inhunks" >&2
     fihunks=$(gethunks "${el}" "${fipatch}")
-    #echo "---"
-    #echo "$fihunks"
-    #echo "---"
+    #echo "---" >&2
+    #echo "$fihunks" >&2
+    #echo "---" >&2
     confhunks=$(getconflicts "${inhunks}" "${fihunks}")
     #echo "confhunks: |$confhunks|" >&2
     if [ ${#confhunks} -gt 0 ] ; then
