@@ -125,12 +125,16 @@ get_comms() {
 
 outfile="/dev/stdout"
 patchcount=0
+maybe_reverse=cat
 while [ $# -gt 0 ] ; do
     PAR=$1
     case $PAR in
         -o)
             outfile=$2
             shift
+            ;;
+        -r)
+            maybe_reverse="interdiff /dev/stdin /dev/null"
             ;;
         -h) ;&
         --help)
@@ -179,6 +183,7 @@ do
     confhunks=$(getconflicts "${inhunks}" "${fihunks}")
     #echo "confhunks: |$confhunks|" >&2
     if [ ${#confhunks} -gt 0 ] ; then
-        filterdiff -i "$el" --hunks="$confhunks" "$inpatch" >> "$outfile"
+        filterdiff -i "$el" --hunks="$confhunks" "$inpatch" \
+            | $maybe_reverse >> "$outfile"
     fi
 done
