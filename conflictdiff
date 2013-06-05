@@ -25,9 +25,15 @@ set -e
 
 usage() {
 cat <<EODOC >&2
-$0 [-o output] patch_a patch_b
+usage: $0 [-r] [-o output] patch_a patch_b
+       $0 -h
 
 Output the hunks from patch_a which conflict with patch_b.
+Options are:
+  -r
+            Reverse output patch
+  -o output_file_name
+            Output to a given file instead of stdout
 
 EODOC
 }
