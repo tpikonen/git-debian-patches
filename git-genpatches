@@ -213,7 +213,7 @@ def main():
             continue
         gitdiff(base, tmpbranch, currstate, opts.exclude)
         tname = os.tempnam()
-        cmd = "minrevert -o " + tname + " " + currstate + " " + fpatches[i]
+        cmd = "conflictdiff -r -o "+tname+" "+currstate+" "+fpatches[i]
         frob(cmd)
         try:
             s = os.stat(tname)
@@ -222,7 +222,7 @@ def main():
                 revpatches.append(tname)
                 cmd = "git apply --index " + tname
                 frob(cmd)
-                cmd = "git commit -m 'minrevert'"
+                cmd = "git commit -m 'Revert patch'"
                 frob(cmd)
             else:
                 revpatches.append("")
@@ -238,7 +238,7 @@ def main():
     fullpatch = os.tempnam()
     gitdiff(tmpbranch, dest, fullpatch, opts.exclude)
     restname = os.tempnam()
-    cmd = "minrevert %s %s | interdiff /dev/stdin /dev/null | filterdiff > %s" \
+    cmd = "conflictdiff %s %s | filterdiff > %s" \
         % (fullpatch, currstate, restname)
     frob(cmd)
     os.remove(currstate)
