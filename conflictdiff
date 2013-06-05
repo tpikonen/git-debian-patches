@@ -89,22 +89,23 @@ getconflicts() {
             fi
 #            echo "fibeg,fiend: |$fibeg|$fiend|"
             # There are 3 possibilities:
-            # 1: inhunk before fihunk, read next inhunk
+            # 1: inhunk before fihunk => read next inhunk
             if test $inend -lt $fibeg ; then
                 break
-            # 2: overlap, mark as conflict, read next inhunk
+            # 2: overlap => mark as conflict, read next inhunk
             elif [ $inend -ge $fibeg -a $inend -le $fiend \
                 -o $inbeg -ge $fibeg -a $inbeg -le $fiend \
                 -o $inbeg -le $fibeg -a $inend -ge $fiend ] ; then
                 conflicts="${conflicts}${index},"
                 break
-            # 3: inhunk after fihunk, read next fihunk
+            # 3: inhunk after fihunk => read next fihunk
             else
                 nextfihunk=true
             fi
         done
         IFS=$'\n'
     done <<< "${fihunks}"
+
     unset IFS
     conflicts=${conflicts%,*}
     echo "$conflicts"
