@@ -27,10 +27,7 @@ usage() {
 cat <<EODOC >&2
 $0 [-o output] patch_a patch_b
 
-Create a patch reverting another patch partially.
-If patch_a and patch_b are two diffs which independently apply cleanly to a
-source tree, output a minimal patch outpatch such that a stack of
-patch_a, outpatch and patch_b applies cleanly to the original source tree.
+Output the hunks from patch_a which conflict with patch_b.
 
 EODOC
 }
