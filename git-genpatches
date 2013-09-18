@@ -66,6 +66,21 @@ def iscommit(name):
         return False
 
 
+def require_clean_working_tree():
+    """Is working tree clean? git calls copied from git-core/git-sh-setup."""
+    clean = True
+    subprocess.check_call("git rev-parse --verify HEAD".split(),
+        stdout=open(os.devnull, 'w'))
+    subprocess.call("git update-index -q --ignore-submodules --refresh".split())
+    if 0 != subprocess.call("git diff-files --quiet --ignore-submodules".split()):
+        print("You have unstaged changes.")
+        clean = False
+    if 0 != subprocess.call("git diff-index --cached --quiet --ignore-submodules HEAD --".split()):
+        print("Your index contains uncommitted changes.")
+        clean = False
+    return clean
+
+
 def temp_branchname():
     """Return a temporary branchname which does not exist."""
     def randstr(N):
@@ -150,6 +165,8 @@ def main():
     base = opts.base
     dest = opts.dest
     series = opts.series
+    if not require_clean_working_tree():
+        oprs.error("Cannot work on a tree with uncommitted changes.")
 
     warnings.filterwarnings("ignore", "tempnam")
 
@@ -183,9 +200,6 @@ def main():
     if len(frefs) != len(set(frefs)):
         oprs.error("Repeated patch branches given")
     npatches = len(frefs)
-
-    cmd = 'git stash save "Local changes saved by git-genpatches"'
-    frob(cmd)
 
     tmpbranch = temp_branchname()
     logging.info("Using temporary branch %s" % tmpbranch)
