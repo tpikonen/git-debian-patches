@@ -36,7 +36,7 @@ refresh ()
 {
     dh_testdir
     rm -f ${patchdir}/debian-changes-*
-    git-genpatches -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
+    git-genpatches -a -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
 }
 
 
