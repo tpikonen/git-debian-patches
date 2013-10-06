@@ -31,9 +31,9 @@ usage: $0 [-r] [-o output] patch_a patch_b
 Output the hunks from patch_a which conflict with patch_b.
 Options are:
   -r
-            Reverse output patch
+        Reverse output patch
   -o output_file_name
-            Output to a given file instead of stdout
+        Output to a given file instead of stdout
 
 EODOC
 }
