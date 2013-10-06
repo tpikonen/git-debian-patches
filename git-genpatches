@@ -30,6 +30,72 @@ of feature branches."""
 usage="%prog [options] <commit-ish> ... "
 
 
+def getclusters(patches):
+    """Return an ordered list of patch clusters which have mutual conflicts.
+
+    If patch Px conflicts with patch Py, they form a connected subgraph
+    called a cluster. A patch without conflicts forms a single patch cluster.
+    This function returns the input patches sorted into a list of clusters
+    with ascending size. Internally, a cluster is a list of patches, where
+    patches are sorted by their number of conflicts. This cluster-internal
+    ordering reduces the number of conflict fixing patches necessary.
+    """
+    for p in patches:
+        p['conflicts'] = []
+        p['found'] = False
+    for i in range(len(patches)):
+        p1 = patches[i]
+        f1 = p1['patchfile']
+        for p2 in patches[(i+1):]:
+            f2 = p2['patchfile']
+            cmd = ['conflictdiff', f1, f2]
+            logging.debug("Running: %s" % cmd)
+            f = subprocess.Popen(cmd, stdout=subprocess.PIPE).stdout
+            L = f.readline(80)
+            hasconflict = len(L) > 0
+            if hasconflict:
+                p1['conflicts'].append(p2)
+                p2['conflicts'].append(p1)
+                f.read(-1) # Read rest of conflictdiff output
+            f.close()
+
+    def dfs(pd, acc):
+        if pd['found']:
+            return acc
+        acc.append(pd)
+        pd['found'] = True
+        for child in pd['conflicts']:
+            dfs(child, acc)
+        return acc
+
+    clusters = []
+    for pd in patches:
+        c = dfs(pd, [])
+        c = sorted(c, key=lambda x: x['basename'])
+        if len(c) > 0:
+            clusters.append(c)
+    clusters = sorted(clusters, key=lambda x: (len(x), x[0]['basename']))
+    clusters = [ sorted(c, key=lambda x: (len(x['conflicts']), x['basename']))
+        for c in clusters ]
+    cnum = 0
+    for c in clusters:
+        cnum = cnum + 1
+        if len(c) > 1:
+            pnum = 0
+            for p in c:
+                pnum = pnum + 1
+                p['name'] = p['basename'] + '.c%dp%d' % (cnum, pnum)
+        else:
+            p = c[0]
+            p['name'] = p['basename']
+
+    for p in [ p for c in clusters for p in c ]:
+        print(p['basename'] + ': '
+            + ','.join(map(lambda x: x['basename'], p['conflicts'])))
+
+    return clusters
+
+
 def frob(cmd):
     logging.debug("Running: %s" % cmd)
     f = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT,
@@ -124,7 +190,7 @@ def get_metadata(metadir):
             branches.append(match.group(1))
             metafiles.append(metadir+'/'+fname)
             logging.info("Found metafile: %s" % metafiles[-1])
-    return metafiles, branches
+    return zip(branches, metafiles)
 
 
 def main():
@@ -152,6 +218,12 @@ def main():
     oprs.add_option("-m", "--metadir", type="string", dest="metadir", \
         default=None, \
         help="Get branch names from metapatches in this directory.")
+    oprs.add_option("-a", "--autosort", action="store_true", dest="autosort", \
+        default=False,\
+        help="Determine a patch order which reduces the number of conflict \
+patches needed, and use it. Otherwise either the order of the branches given \
+in the command line, or the lexicographic order of metapatch names is used \
+for ordering the patches.")
     oprs.add_option("-v", "--verbose", action="count", dest="verbosity", \
         default=0, \
         help="Increase verbosity. Use two times for debug output.")
@@ -177,57 +249,69 @@ def main():
         oprs.error("'" + dest + "' is not a valid commit")
     logging.info("Dest branch: %s" % dest)
     if opts.metadir:
-        metafiles, branchnames = get_metadata(opts.metadir)
+        branchmeta = get_metadata(opts.metadir)
     else:
-        branchnames = args
-        metafiles = [ None for b in branchnames ]
-    logging.info("Creating patches for branches: %s" % ' '.join(branchnames))
+        branchmeta = zip(args, [ None for a in args ])
+    logging.info("Creating patches for branches: %s"
+        % ' '.join(b[0] for b in branchmeta))
     logging.info("Writing patches to: %s" % patchdir)
     if opts.exclude:
         map(lambda s: logging.info("Excluding files matching: %s" % s),
             opts.exclude)
 
     allrefs = getrefs()
-    frefs = []
-    for name in branchnames:
-        l = fnmatch.filter(allrefs, name) # FIXME: Use git rev-parse?
-        if l:
-            frefs = frefs + l
-        elif iscommit(name):
-            frefs.append(name)
+    patches = []
+    for branchname, metafile in branchmeta:
+        l = fnmatch.filter(allrefs, branchname) # FIXME: Use git rev-parse?
+        if l and len(l) == 1:
+            fref = l[0]
+        elif iscommit(branchname):
+            fref = branchname
         else:
-            oprs.error("Could not match '"+name+"' to a ref.")
-    if len(frefs) != len(set(frefs)):
+            oprs.error("Could not match '"+branchname+"' to a unique ref.")
+        pname = os.tempnam('/tmp', 'patch')
+        gitdiff(base, fref, pname, opts.exclude)
+        patches.append({'patchfile' : pname,
+            'metafile' : metafile,
+            'basename' : os.path.basename(branchname),
+            'fref' : fref, })
+
+    refs = [ p['fref'] for p in patches ]
+    if len(refs) != len(set(refs)):
         oprs.error("Repeated patch branches given")
-    npatches = len(frefs)
+
+    npatches = len(patches)
+
+    if opts.autosort:
+        clusters = getclusters(patches)
+        patches = [ p for c in clusters for p in c ] # Flatten clusters
+    else:
+        for p in patches:
+            p['name'] =  p['basename']
 
     tmpbranch = temp_branchname()
     logging.info("Using temporary branch %s" % tmpbranch)
     cmd = "git checkout -b " + tmpbranch + " " + base
     frob(cmd)
 
-    fpatches = []
     revpatches = [];
     if npatches > 0:
-        logging.info("Processing branch %s" % frefs[0])
-        fpatches.append(os.tempnam())
-        gitdiff(base, frefs[0], fpatches[0], opts.exclude)
-        if is_okdiff(fpatches[0], frefs[0]):
-            cmd = "git apply --index " + fpatches[0]
+        p0 = patches[0]
+        logging.info("Processing branch %s" % p0['fref'])
+        if is_okdiff(p0['patchfile'], p0['fref']):
+            cmd = "git apply --index " + p0['patchfile']
             frob(cmd)
             cmd = "git commit -m '0'"
             frob(cmd)
     currstate = os.tempnam()
-    for i in range(1,npatches):
-        logging.info("Processing branch %s" % frefs[i])
-        fpatches.append(os.tempnam())
-        gitdiff(base, frefs[i], fpatches[i], opts.exclude)
-        if not is_okdiff(fpatches[i], frefs[i]):
+    for p in patches[1:]:
+        logging.info("Processing branch %s" % p['fref'])
+        if not is_okdiff(p['patchfile'], p['fref']):
             revpatches.append("")
             continue
         gitdiff(base, tmpbranch, currstate, opts.exclude)
         tname = os.tempnam()
-        cmd = "conflictdiff -r -o "+tname+" "+currstate+" "+fpatches[i]
+        cmd = "conflictdiff -r -o "+tname+" "+currstate+" "+p['patchfile']
         frob(cmd)
         try:
             s = os.stat(tname)
@@ -243,9 +327,9 @@ def main():
                 os.remove(tname)
         except:
             revpatches.append("")
-        cmd = "git apply --index " + fpatches[i]
+        cmd = "git apply --index " + p['patchfile']
         frob(cmd)
-        cmd = "git commit -m '%d'" % i
+        cmd = "git commit -m '%s'" % p['basename']
         frob(cmd)
 
     gitdiff(base, tmpbranch, currstate, opts.exclude)
@@ -280,23 +364,25 @@ def main():
                     logging.debug("File '%s' does not exist." % filename)
                     pass
 
-    def append(srcname, dstname):
+    def appendfile(srcname, dstname):
         with open(srcname, 'r') as fsrc:
             with open(dstname, 'a') as fdst:
                 fdst.write('\n')
                 shutil.copyfileobj(fsrc, fdst)
 
+    numformat = "%02d_" if len(patches) < 50 else "%04d_"
     def movefeat(i, n, metafile=None):
-        pname = "%02d_%s.patch" % (n, os.path.basename(frefs[i]))
+        pname = (numformat + "%s.patch") % (n, patches[i]['name'])
         print("Writing patch %s" % pname)
         patchnames.append(pname)
         if metafile:
             shutil.copy(metafile, patchdir + pname)
-        append(fpatches[i], patchdir + pname)
-        os.remove(fpatches[i])
+        appendfile(patches[i]['patchfile'], patchdir + pname)
+        os.remove(patches[i]['patchfile'])
 
     def moverev(i, n):
-        pname = "%02d_CONFLICTS_IN_%s.patch"%(n, os.path.basename(frefs[i+1]))
+        pname = (numformat + "CONFLICTS_IN_%s.patch") \
+            % (n, patches[i+1]['basename'])
         print("Writing patch %s" % pname)
         patchnames.append(pname)
         shutil.move(revpatches[i], patchdir + pname)
@@ -304,13 +390,13 @@ def main():
     pno = 1
     patchnames = []
     if npatches > 0:
-        movefeat(0, pno, metafiles[0])
+        movefeat(0, pno, patches[0]['metafile'])
     pno = pno+1
     for i in range(1,npatches):
         if len(revpatches[i-1]) > 0:
             moverev(i-1, pno)
             pno = pno+1
-        movefeat(i, pno, metafiles[i])
+        movefeat(i, pno, patches[i]['metafile'])
         pno = pno+1
 
     if have_respatch:
