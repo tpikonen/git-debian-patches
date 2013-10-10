@@ -116,6 +116,16 @@ def getrefs():
     return refs
 
 
+def gethash(ref):
+    cmd = "git show-ref "+ref+ r" | head -n1 | sed 's/^\([a-f0-9]*\) .*$/\1/'"
+    logging.debug("Running: %s" % cmd)
+    f = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+    sha = f.readline().strip()
+    f.readlines()
+    f.close()
+    logging.debug("ref '%s' has hash '%s'" % (ref, sha))
+    return sha
+
 def iscommit(name):
     if len(name) == 0:
         return False
@@ -260,6 +270,7 @@ for ordering the patches.")
             opts.exclude)
 
     allrefs = getrefs()
+    basehash = gethash(base)
     patches = []
     for branchname, metafile in branchmeta:
         l = fnmatch.filter(allrefs, branchname) # FIXME: Use git rev-parse?
@@ -269,12 +280,14 @@ for ordering the patches.")
             fref = branchname
         else:
             oprs.error("Could not match '"+branchname+"' to a unique ref.")
+        frefhash = gethash(fref)
         pname = os.tempnam('/tmp', 'patch')
         gitdiff(base, fref, pname, opts.exclude)
         patches.append({'patchfile' : pname,
             'metafile' : metafile,
             'basename' : os.path.basename(branchname),
-            'fref' : fref, })
+            'fref' : fref,
+            'frefhash' : frefhash })
 
     refs = [ p['fref'] for p in patches ]
     if len(refs) != len(set(refs)):
@@ -376,7 +389,13 @@ for ordering the patches.")
         print("Writing patch %s" % pname)
         patchnames.append(pname)
         if metafile:
-            shutil.copy(metafile, patchdir + pname)
+            with open(metafile) as fin:
+                metastr = fin.read(-1)
+            refstr = r'\1X-git-diff: %s..%s\n' \
+                % (basehash[:30], patches[i]['frefhash'][:30])
+            outstr = re.sub(r'(X-git-branch:.*\n)', refstr, metastr)
+            with open(patchdir + pname, 'w') as fout:
+                fout.write(outstr)
         appendfile(patches[i]['patchfile'], patchdir + pname)
         os.remove(patches[i]['patchfile'])
 
