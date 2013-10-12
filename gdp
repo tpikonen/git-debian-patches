@@ -78,7 +78,7 @@ tagheads ()
     i=1
     for metafile in ${metadir}/*
     do
-        branch=$(sed -n 's/X-git-branch: *\(.*\)$/\1/p' $metafile)
+        branch=$(sed -n 's/Git-Branch: *\(.*\)$/\1/p' $metafile)
         echo "Tagging ${branch} with ${version}/${branch}"
         git tag ${version}/${branch} ${branch}
     done
@@ -131,7 +131,7 @@ newpatch ()
     cat > $metaname << EOF_really
 From: $DEBFULLNAME <$DEBEMAIL>
 Subject: 
-X-git-branch: $branchname
+Git-Branch: $branchname
 EOF_really
     echo "Launching $EDITOR $metaname ..."
     $EDITOR $metaname

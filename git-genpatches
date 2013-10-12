@@ -195,7 +195,7 @@ def get_metadata(metadir):
     metafiles = []
     for fname in allfiles:
         with open(metadir + '/' + fname) as ff:
-            match = re.search("^X-git-branch: *(.*)$", ff.read(), re.MULTILINE)
+            match = re.search("^Git-Branch: *(.*)$", ff.read(), re.MULTILINE)
         if match:
             branches.append(match.group(1))
             metafiles.append(metadir+'/'+fname)
@@ -389,9 +389,9 @@ for ordering the patches.")
         if metafile:
             with open(metafile) as fin:
                 metastr = fin.read(-1)
-            refstr = r'\1X-git-diff: %s..%s\n' \
+            refstr = r'\1Git-Diff: %s..%s\n' \
                 % (basehash[:30], patches[i]['frefhash'][:30])
-            outstr = re.sub(r'(X-git-branch:.*\n)', refstr, metastr)
+            outstr = re.sub(r'(Git-Branch:.*\n)', refstr, metastr)
             with open(patchdir + pname, 'w') as fout:
                 fout.write(outstr)
         appendfile(patches[i]['patchfile'], patchdir + pname)

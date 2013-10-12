@@ -35,7 +35,7 @@ by DEP-3 header information files in 'debian/metapatches'. The patches are
 created and applied in lexicographic ordering of the patch header files, so if
 a specific ordering of the patch files is needed, these files should be named
 like 'NN_name', where NN is a number, to force the ordering.  The header field
-'X-git-branch' in the metapatch file points to the git branch used to generate
+'Git-Branch' in the metapatch file points to the git branch used to generate
 the patch file.
 
 Upstream modifying commits not included in any of the patch branches
