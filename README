@@ -10,14 +10,14 @@ git import-orig --no-merge --pristine-tar ../upstream_ver.orig.tar.gz
 2. Merge the updated 'upstream' branch to all of the patch ('p/*') branches.
 Resolve conflicts with git mergetool or by hand.
 
-git co p/makefile ; git merge upstream ; git mergetool ; git commit
-git co p/feature1 ; git merge upstream ; git mergetool ; git commit
-git co p/feature2 ; git merge upstream ; git mergetool ; git commit
+git checkout p/makefile ; git merge upstream ; git mergetool ; git commit
+git checkout p/feature1 ; git merge upstream ; git mergetool ; git commit
+git checkout p/feature2 ; git merge upstream ; git mergetool ; git commit
 
 
 3a. Create a temporary branch starting from one of the patch branches.
 
-git co -b temp p/makefile
+git checkout -b temp p/makefile
 
 
 3b. Merge all the patch branches to the temporary branch and resolve
@@ -44,7 +44,7 @@ git co master; git merge --squash -s recursive -X theirs temp
 been made from upstream to master:
 
 git rev-parse upstream > .git/MERGE_HEAD
-echo "Merge from 'upstream' branch" > .git/MERGE_MSG
+echo "Merge from upstream branch with merged patches" > .git/COMMIT_EDITMSG
 
 
 6. Commit the merge:
