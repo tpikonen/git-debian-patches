@@ -176,6 +176,9 @@ def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat ", debug=True):
     grep_pattern = "-e '"+"' -e '".join(exlist)+"'"
     # pattern '(?!x)x' always matches.
     cmd = "git diff "+diffargs+" "+b1+".."+b2+" -- `"+filescmd+" | grep -v --regexp='(?!x)x' "+grep_pattern+"` > "+pname
+#    # excluding with git pathspec magic, not a full regexp though
+#    cmd = "git diff "+diffargs+" "+b1+".."+b2+" -- ." + \
+#        " ".join("':(exclude)%s'" % x for x in exlist) + " > "+pname
     logging.debug("Running: %s" % cmd)
     return subprocess.call(cmd, shell=True)
 
