@@ -314,6 +314,7 @@ for ordering the patches.")
 
     revpatches = [];
     if npatches > 0:
+        revpatches.append("")
         p0 = patches[0]
         logging.info("Processing branch %s" % p0['fref'])
         if is_okdiff(p0['patchfile'], p0['fref']):
@@ -404,19 +405,16 @@ for ordering the patches.")
 
     def moverev(i, n):
         pname = (numformat + "CONFLICTS_IN_%s.patch") \
-            % (n, patches[i+1]['basename'])
+            % (n, patches[i]['basename'])
         print("Writing patch %s" % pname)
         patchnames.append(pname)
         shutil.move(revpatches[i], patchdir + pname)
 
     pno = 1
     patchnames = []
-    if npatches > 0:
-        movefeat(0, pno, patches[0]['metafile'])
-    pno = pno+1
-    for i in range(1,npatches):
-        if len(revpatches[i-1]) > 0:
-            moverev(i-1, pno)
+    for i in range(npatches):
+        if len(revpatches[i]) > 0:
+            moverev(i, pno)
             pno = pno+1
         movefeat(i, pno, patches[i]['metafile'])
         pno = pno+1
