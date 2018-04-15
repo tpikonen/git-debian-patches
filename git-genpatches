@@ -25,20 +25,21 @@ from optparse import OptionParser
 
 description="""\
 Create a series of patches to take a branch to another through a number
-of feature branches."""
+of possibly conflicting feature branches."""
 
 usage="%prog [options] <commit-ish> ... "
 
 
 def getclusters(patches):
-    """Return an ordered list of patch clusters which have mutual conflicts.
+    """Return an ordered list of patch clusters which have mutual overlaps.
 
-    If patch Px conflicts with patch Py, they form a connected subgraph
-    called a cluster. A patch without conflicts forms a single patch cluster.
-    This function returns the input patches sorted into a list of clusters
-    with ascending size. Internally, a cluster is a list of patches, where
-    patches are sorted by their number of conflicts. This cluster-internal
-    ordering reduces the number of conflict fixing patches necessary.
+    If patch Px overlaps with patch Py, they form a cluster. A patch without
+    conflicts forms a single patch cluster.  This function returns the input
+    patches sorted into a list of clusters with ascending size. A cluster
+    itself is a list of patches, where patches are sorted by their number of
+    conflicts. This cluster-internal ordering reduces the number of conflict
+    fixing patches necessary.
+
     """
     for p in patches:
         p['conflicts'] = []
@@ -170,7 +171,7 @@ def temp_branchname():
 
 
 def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat ", debug=True):
-    # 'git diff' has no -x option and I want to cry.
+    """Output a diff between b1 and b2 to file pname."""
     filescmd="(git ls-tree -r --name-only %s ; git ls-tree -r --name-only %s) | sort | uniq" % (b1, b2)
     grep_pattern = "-e '"+"' -e '".join(exlist)+"'"
     # pattern '(?!x)x' always matches.
@@ -180,6 +181,7 @@ def gitdiff(b1, b2, pname, exlist, diffargs="-p --stat ", debug=True):
 
 
 def is_okdiff(fname, branchname):
+    """Return whether a patch / branch has some content in it."""
     s = os.stat(fname)
     if s.st_size > 0:
         return True
