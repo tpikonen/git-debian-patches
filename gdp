@@ -30,6 +30,41 @@ debbranch="master"
 upbranch="upstream"
 pristbranch="pristine-tar"
 
+# usage $EXITCODE $MESSAGE
+# Print usage and die() with the given message and exit code.
+usage ()
+{
+    cat >&2 << EOM
+Usage:
+    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> ]
+
+git debian patch helper.
+
+Commands:
+    refresh     Generate debian/patches from patch branches.
+    tag-heads   Tag upstream, debian and patch branches for release.
+    new-patch <name>
+                Create a new patch + branch with a given name.
+    pick <branch> <commit>
+                Cherry pick <commit> to <branch> without leaving
+                the current branch.
+EOM
+#Options:
+#    -x      ?
+#EOM
+    echo "" >&2
+    die "$1" "$2"
+}
+
+
+# die $EXITCODE $MESSAGE
+# Print a message and exit with a given exit code.
+die ()
+{
+    echo "$2" >&2
+    exit "$1"
+}
+
 
 # Recreate patches with git-genpatches.
 refresh ()
@@ -37,16 +72,6 @@ refresh ()
     dh_testdir
     rm -f ${patchdir}/debian-changes-*
     git-genpatches -a -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
-}
-
-
-# build
-# Refresh the patches and build the sources with debuild.
-build ()
-{
-    dh_testdir
-    refresh
-    debuild
 }
 
 
@@ -84,17 +109,6 @@ tagheads ()
     done
     echo "Tagging ${debbranch} with debian/${version}"
     git tag debian/${version} ${debbranch}
-}
-
-
-# import-orig tarballname
-# Import the tarball to $debbranch and pristine-tar branches,
-# but do not merge the to master
-importorig ()
-{
-    dh_testdir
-    tball=$1
-    git import-orig --no-merge --pristine-tar --upstream-branch=${upbranch} ${tball}
 }
 
 
@@ -161,21 +175,17 @@ pick ()
 
 PROGNAME=$(basename $0)
 case $1 in
+    "" | "-h" | "--help")
+        usage 1 "" ;;
     refresh)
         shift ; refresh ;;
-    build)
-        shift ; build ;;
     tag-heads)
         shift ; tagheads $@ ;;
-    import-orig)
-        shift ; importorig $@ ;;
-    new-patch)
-        shift ; newpatch $@ ;;
-    newpatch)
+    new-patch|newpatch)
         shift ; newpatch $@ ;;
     pick)
         shift ; pick $@ ;;
     *)
-        echo "$PROGNAME: Error: Unknown subcommand." >&2
-        exit 1 ;;
+        die 1 "$PROGNAME: Error: Unknown subcommand."
+        ;;
 esac
