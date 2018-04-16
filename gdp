@@ -36,7 +36,7 @@ usage ()
 {
     cat >&2 << EOM
 Usage:
-    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> ]
+    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> | merge-upstream ]
 
 git debian patch helper.
 
@@ -48,6 +48,9 @@ Commands:
     pick <branch> <commit>
                 Cherry pick <commit> to <branch> without leaving
                 the current branch.
+    merge-upstream
+                Merge upstream branch (default '$upbranch') to the current
+                branch with suitable 'git merge' options.
 EOM
 #Options:
 #    -x      ?
@@ -173,6 +176,18 @@ pick ()
 }
 
 
+# merge-upstream
+# Merge upbranch to debbranch with suitable git merge options
+merge_upstream ()
+{
+    dh_testdir
+    currbranch=$(git symbolic-ref --short HEAD)
+#    [ "$currbranch" = "$debbranch" ] \
+#        || die 1 "Current branch is not the Debian branch ($debbranch)."
+    git merge -s recursive -X ours "$upbranch"
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     "" | "-h" | "--help")
@@ -185,6 +200,8 @@ case $1 in
         shift ; newpatch $@ ;;
     pick)
         shift ; pick $@ ;;
+    merge-upstream)
+        shift ; merge_upstream $@ ;;
     *)
         die 1 "$PROGNAME: Error: Unknown subcommand."
         ;;
