@@ -30,7 +30,7 @@ of possibly conflicting feature branches."""
 usage="%prog [options] <commit-ish> ... "
 
 
-def getclusters(patches):
+def getclusters(patches, name_clusters=False):
     """Return an ordered list of patch clusters which have mutual overlaps.
 
     If patch Px overlaps with patch Py, they form a cluster. A patch without
@@ -39,6 +39,10 @@ def getclusters(patches):
     itself is a list of patches, where patches are sorted by their number of
     conflicts. This cluster-internal ordering reduces the number of conflict
     fixing patches necessary.
+
+    If name_clusters is True, then a string of the form '.c3p2' is appended
+    to the patch name, for patches belonging to clusters of length > 1,
+    indicating the cluster number and the patch number inside the cluster.
 
     """
     for p in patches:
@@ -81,18 +85,17 @@ def getclusters(patches):
     cnum = 0
     for c in clusters:
         cnum = cnum + 1
-        if len(c) > 1:
-            pnum = 0
-            for p in c:
-                pnum = pnum + 1
+        pnum = 0
+        for p in c:
+            pnum = pnum + 1
+            if len(c) > 1 and name_clusters:
                 p['name'] = p['basename'] + '.c%dp%d' % (cnum, pnum)
-        else:
-            p = c[0]
-            p['name'] = p['basename']
+            else:
+                p['name'] = p['basename']
 
     for p in [ p for c in clusters for p in c ]:
         print(p['basename'] + ': '
-            + ','.join(map(lambda x: x['basename'], p['conflicts'])))
+            + ', '.join(map(lambda x: x['basename'], p['conflicts'])))
 
     return clusters
 
