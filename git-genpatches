@@ -391,12 +391,12 @@ for ordering the patches.")
     seriesfile = patchdir + "series"
     if os.path.isfile(seriesfile):
         logging.info("Removing files from previous seriesfile %s" % seriesfile)
-        with open(patchdir + "series") as fs:
+        with open(patchdir + "series") as fs, open(os.devnull, 'w') as dnull:
             for line in fs:
                 filename = patchdir + line.rstrip()
                 cmd = ['git', 'rm', filename]
                 logging.debug("Running: %s" % cmd)
-                subprocess.call(cmd)
+                subprocess.call(cmd, stdout=dnull)
 
     def appendfile(srcname, dstname):
         with open(srcname, 'r') as fsrc:
