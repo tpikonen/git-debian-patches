@@ -208,6 +208,53 @@ def get_metadata(metadir):
     return zip(branches, metafiles)
 
 
+def apply_cluster(c, base, exclude):
+    """Apply a list of patches to the current branch, return a list
+    with a revert patch name if it's needed, or None if it's not."""
+    if len(c) < 1:
+        oprs.error("Empty cluster found.")
+    rps = []
+    for p in c:
+        logging.info("Processing branch %s" % p['fref'])
+        if not is_okdiff(p['patchfile'], p['fref']):
+            rps.append(None)
+            continue
+        # First try 'git apply', if it fails, make a revert patch
+        if subprocess.call(["git", "apply", "--index", p['patchfile']], \
+              stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT) == 0:
+            subprocess.check_call(["git", "commit", "-m", p['fref']], \
+                stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+            rps.append(None)
+            continue
+        # Make a revert patch
+        logging.info("Direct apply failed, need a revert patch.")
+        currstate = os.tempnam()
+        gitdiff(base, "HEAD", currstate, exclude)
+        tname = os.tempnam()
+        cmd = "conflictdiff -r -o "+tname+" "+currstate+" "+p['patchfile']
+        frob(cmd)
+        os.remove(currstate)
+        try:
+            s = os.stat(tname)
+            if s.st_size > 0:
+                logging.info("    Revert patch needed")
+                rps.append(tname)
+                cmd = "git apply --index " + tname
+                frob(cmd)
+                cmd = "git commit -m 'Revert patch'"
+                frob(cmd)
+            else:
+                rps.append(None)
+                os.remove(tname)
+        except:
+            rps.append(None)
+        cmd = "git apply --index " + p['patchfile']
+        frob(cmd)
+        cmd = "git commit -m '%s'" % p['basename']
+        frob(cmd)
+    return rps
+
+
 def main():
     default_base = "upstream"
     default_dest = "master"
@@ -306,6 +353,7 @@ for ordering the patches.")
     else:
         for p in patches:
             p['name'] =  p['basename']
+        clusters = [ [p] for p in patches ]
 
     tmpbranch = temp_branchname()
     logging.info("Using temporary branch %s" % tmpbranch)
@@ -313,44 +361,10 @@ for ordering the patches.")
     frob(cmd)
 
     revpatches = [];
-    if npatches > 0:
-        revpatches.append("")
-        p0 = patches[0]
-        logging.info("Processing branch %s" % p0['fref'])
-        if is_okdiff(p0['patchfile'], p0['fref']):
-            cmd = "git apply --index " + p0['patchfile']
-            frob(cmd)
-            cmd = "git commit -m '0'"
-            frob(cmd)
-    currstate = os.tempnam()
-    for p in patches[1:]:
-        logging.info("Processing branch %s" % p['fref'])
-        if not is_okdiff(p['patchfile'], p['fref']):
-            revpatches.append("")
-            continue
-        gitdiff(base, tmpbranch, currstate, opts.exclude)
-        tname = os.tempnam()
-        cmd = "conflictdiff -r -o "+tname+" "+currstate+" "+p['patchfile']
-        frob(cmd)
-        try:
-            s = os.stat(tname)
-            if s.st_size > 0:
-                logging.info("    Revert patch needed")
-                revpatches.append(tname)
-                cmd = "git apply --index " + tname
-                frob(cmd)
-                cmd = "git commit -m 'Revert patch'"
-                frob(cmd)
-            else:
-                revpatches.append("")
-                os.remove(tname)
-        except:
-            revpatches.append("")
-        cmd = "git apply --index " + p['patchfile']
-        frob(cmd)
-        cmd = "git commit -m '%s'" % p['basename']
-        frob(cmd)
+    for c in clusters:
+        revpatches.extend(apply_cluster(c, base, opts.exclude))
 
+    currstate = os.tempnam()
     gitdiff(base, tmpbranch, currstate, opts.exclude)
     fullpatch = os.tempnam()
     gitdiff(tmpbranch, dest, fullpatch, opts.exclude)
@@ -413,7 +427,7 @@ for ordering the patches.")
     pno = 1
     patchnames = []
     for i in range(npatches):
-        if len(revpatches[i]) > 0:
+        if revpatches[i]:
             moverev(i, pno)
             pno = pno+1
         movefeat(i, pno, patches[i]['metafile'])
