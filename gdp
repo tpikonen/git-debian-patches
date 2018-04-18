@@ -36,7 +36,7 @@ usage ()
 {
     cat >&2 << EOM
 Usage:
-    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> | merge-upstream | merge-patches ]
+    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> | merge-upstream | merge-patches | log [ <patchbranch ] ]
 
 git debian patch helper.
 
@@ -55,6 +55,9 @@ Commands:
                 Merge all patch branches with the correct prefix
                 (default '$prefix') to the current branch with suitable
                 'git merge' options.
+    log [<patchbranch>]
+                Run 'git log' showing only commits made directly to a patch
+                branch, leaving out upstream commits or merges.
 EOM
 #Options:
 #    -x      ?
@@ -229,6 +232,37 @@ merge_patches ()
 }
 
 
+# log [ <patchbranch> ]
+# Run git log with arguments which cause it to show only commits made to
+# the patchbranch, no merges and upstream commits
+log ()
+{
+    local opts branch rest
+
+    opts=
+    branch=
+    rest=
+    while [ "$#" -gt 0 ]
+    do
+        case "$1" in
+            -*)
+                opts="$opts $1" ;;
+            *)
+                if [ "$branch" = "" ] ; then
+                    branch="$1"
+                else
+                    rest="$rest $1"
+                fi
+        esac
+        shift
+    done
+    [ "$branch" = "" ] && branch="HEAD"
+
+    git log --no-merges --oneline --right-only $opts "$upbranch...$branch" $rest
+
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     "" | "-h" | "--help")
@@ -245,6 +279,8 @@ case $1 in
         shift ; merge_upstream $@ ;;
     merge-patches)
         shift ; merge_patches $@ ;;
+    log)
+        shift ; log $@ ;;
     *)
         die 1 "$PROGNAME: Error: Unknown subcommand."
         ;;
