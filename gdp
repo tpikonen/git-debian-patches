@@ -36,7 +36,7 @@ usage ()
 {
     cat >&2 << EOM
 Usage:
-    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> | merge-upstream ]
+    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> | merge-upstream | merge-patches ]
 
 git debian patch helper.
 
@@ -51,6 +51,10 @@ Commands:
     merge-upstream
                 Merge upstream branch (default '$upbranch') to the current
                 branch with suitable 'git merge' options.
+    merge-patches
+                Merge all patch branches with the correct prefix
+                (default '$prefix') to the current branch with suitable
+                'git merge' options.
 EOM
 #Options:
 #    -x      ?
@@ -188,6 +192,43 @@ merge_upstream ()
 }
 
 
+# merge_patches
+# Do a series of squash merges of patch branches to the Debian branch.
+# The patch branches should be already merged with upstream, so the squash
+# commits will only bring the changes introduced in the patch+upstream
+# merges to the Debian branch.
+merge_patches ()
+{
+    dh_testdir
+    currbranch=$(git symbolic-ref --short HEAD)
+#    [ "$currbranch" = "$debbranch" ] \
+#        || die 1 "Current branch is not the Debian branch ($debbranch)."
+    branches=$(git branch --list "$prefix""*")
+    echo "Committing merge results from branches:"
+    echo "$branches"
+    git merge-base --is-ancestor "$upbranch" "$currbranch" \
+        || die 1 "Current branch is not merged with branch '$upbranch'."
+    tmpout=$(tempfile)
+    for patchbranch in $branches ; do
+        if git merge-base --is-ancestor "$upbranch" "$patchbranch" ; then
+            echo "Processing branch $patchbranch"
+            # The 'resolve' strategy seems to pick up the correct merge base
+            # (i.e. upstream, or $upbranch) better than 'recursive'.
+            git merge --squash -s resolve "$patchbranch" &> $tmpout \
+                || { echo "Merge failed:" ; cat "$tmpout" ; false ; }
+            # commit but exclude everything under 'debian/' (i.e. headers)
+            git commit -m "$patchbranch + $upbranch merge result." \
+                -- . ':!debian/' &> $tmpout || cat "$tmpout"
+            # remove headers from index and tree
+            git reset --hard HEAD &> $tmpout || cat "$tmpout"
+        else
+            die 1 "Branch '$patchbranch' is not merged with '$upbranch'."
+        fi
+    done
+    rm -f "$tmpout"
+}
+
+
 PROGNAME=$(basename $0)
 case $1 in
     "" | "-h" | "--help")
@@ -202,6 +243,8 @@ case $1 in
         shift ; pick $@ ;;
     merge-upstream)
         shift ; merge_upstream $@ ;;
+    merge-patches)
+        shift ; merge_patches $@ ;;
     *)
         die 1 "$PROGNAME: Error: Unknown subcommand."
         ;;
