@@ -29,6 +29,7 @@ pext=".patch"
 debbranch="master"
 upbranch="upstream"
 pristbranch="pristine-tar"
+DEP3dir="debian/dep3-headers"
 
 # usage $EXITCODE $MESSAGE
 # Print usage and die() with the given message and exit code.
@@ -36,7 +37,7 @@ usage ()
 {
     cat >&2 << EOM
 Usage:
-    $(basename "$0") [-p <branch-prefix>] [refresh | tag-heads | new-patch <name> | pick <branch> <commit> | merge-upstream | merge-patches | log [<patchbranch]]
+    $(basename "$0") [-p <branch-prefix>] [refresh | tag-heads | new-patch <name> | pick <patchbranch> <commit> | merge-upstream | merge-patches | log [<patchbranch>] | add-header <patchbranch> ]
 
 git debian patch helper.
 
@@ -45,7 +46,7 @@ Commands:
     tag-heads   Tag upstream, debian and patch branches for release.
     new-patch <name>
                 Create a new patch + branch with a given name.
-    pick <branch> <commit>
+    pick <patchbranch> <commit>
                 Cherry pick <commit> to <branch> without leaving
                 the current branch.
     merge-upstream
@@ -58,6 +59,9 @@ Commands:
     log [<patchbranch>]
                 Run 'git log' showing only commits made directly to a patch
                 branch, leaving out upstream commits or merges.
+    add-header <patchbranch>
+                Add a DEP3 header skeleton to a patch branch and run an
+                editor on it.
 
 Options:
     -p, --branch-prefix
@@ -158,14 +162,51 @@ newpatch ()
     echo "Creating a new branch $branchname ..."
     git branch $branchname $upbranch
     metaname=$(printf "%s/%0${pnum_width}d_%s" $metadir $pnum $patchname)
-    echo "Creating metapatch $metaname ..."
-    cat > $metaname << EOF_really
+    describe_patch "$metaname"
+}
+
+# describe_patch filename
+# Start an editor with a given filename, pre-fill it the file with
+# DEP3 headers, if the file does not exist.
+describe_patch ()
+{
+    hdrfile=$1
+    branchname=$(git symbolic-ref --short HEAD)
+    if [ ! -f "$hdrfile" ] ; then
+        mkdir -p $(dirname "$hdrfile")
+        echo "Creating patch header $hdrfile ..."
+        cat > $hdrfile << EOF_really
 From: $DEBFULLNAME <$DEBEMAIL>
 Subject: 
+Origin: 
+Bug-Debian: 
+Forwarded: 
+Last-Update: $(date -I)
+Reviewed-by: 
+Applied-Upstream: 
 Git-Branch: $branchname
 EOF_really
-    echo "Launching $EDITOR $metaname ..."
-    $EDITOR $metaname
+    else
+        sed -i "s/^Last-Update:.*$/Last-Update: $(date -I)/" "$hdrfile"
+    fi
+
+    echo "Launching $EDITOR $hdrfile ..."
+    $EDITOR "$hdrfile"
+}
+
+# add_header <patchbranch>
+# Add a DEP3 patch header to patch branch at $DEP3dir
+add_header ()
+{
+    local branch
+    if [ "$#" -lt 1 ] ; then
+        branch=$(git symbolic-ref --short HEAD)
+    else
+        branch="$1"
+        git co $branch
+    fi
+    hdrfile="$DEP3dir/${branch##$prefix}"
+    describe_patch "$hdrfile"
 }
 
 
@@ -290,6 +331,8 @@ case $1 in
         shift ; merge_patches $@ ;;
     log)
         shift ; log $@ ;;
+    add-header)
+        shift ; add_header $@ ;;
     *)
         die 1 "$PROGNAME: Error: Unknown subcommand."
         ;;
