@@ -214,6 +214,29 @@ def get_branchdata(metadir):
     return zip(branches, headers)
 
 
+def get_header_from_branch(branch, headerdir):
+    """Return a patch header string read from a git branch
+    at header directory."""
+    # Match filename to the part of branchname after the last slash.
+    patchname = branch[(branch.rindex('/')+1):]
+    headerstr = None
+    cmd = ['git', 'ls-tree', branch, headerdir+"/"]
+    d = subprocess.Popen(cmd, stdout=subprocess.PIPE).stdout
+    for line in d.readlines():
+        tabsplit = line.split('\t')
+        fname = tabsplit[1].strip()
+        fname = fname[(fname.rindex('/')+1):]
+        dats = tabsplit[0].split(' ')
+        if dats[1] != 'blob' or fname != patchname:
+            continue
+        cmd = ['git', 'cat-file', 'blob', dats[2]]
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE).stdout as ff:
+            headerstr = ff.read(-1)
+            break
+    d.close()
+    return headerstr
+
+
 def apply_cluster(c, base, exclude):
     """Apply a list of patches to the current branch, return a list
     with a revert patch name if it's needed, or None if it's not."""
@@ -319,7 +342,7 @@ for ordering the patches.")
     if opts.metadir:
         branchmeta = get_branchdata(opts.metadir)
     else:
-        branchmeta = zip(args, [ None for a in args ])
+        branchmeta = [(b, get_header_from_branch(b, "debian/dep3-headers")) for b in args]
     logging.info("Creating patches for branches: %s"
         % ' '.join(b[0] for b in branchmeta))
     logging.info("Writing patches to: %s" % patchdir)
