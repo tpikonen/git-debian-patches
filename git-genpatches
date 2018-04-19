@@ -196,19 +196,22 @@ def is_okdiff(fname, branchname):
         return False
 
 
-def get_metadata(metadir):
+def get_branchdata(metadir):
+    """Return a list of (branchname, headerstr) tuples read from files in
+    metadir."""
     allfiles = os.listdir(metadir)
     allfiles.sort()
     branches = []
-    metafiles = []
+    headers = []
     for fname in allfiles:
         with open(metadir + '/' + fname) as ff:
             match = re.search("^Git-Branch: *(.*)$", ff.read(), re.MULTILINE)
-        if match:
-            branches.append(match.group(1))
-            metafiles.append(metadir+'/'+fname)
-            logging.info("Found metafile: %s" % metafiles[-1])
-    return zip(branches, metafiles)
+            if match:
+                branches.append(match.group(1))
+                ff.seek(0)
+                headers.append(ff.read(-1))
+                logging.info("Found header file: %s" % (metadir + '/' + fname))
+    return zip(branches, headers)
 
 
 def apply_cluster(c, base, exclude):
@@ -314,7 +317,7 @@ for ordering the patches.")
         oprs.error("'" + dest + "' is not a valid commit")
     logging.info("Dest branch: %s" % dest)
     if opts.metadir:
-        branchmeta = get_metadata(opts.metadir)
+        branchmeta = get_branchdata(opts.metadir)
     else:
         branchmeta = zip(args, [ None for a in args ])
     logging.info("Creating patches for branches: %s"
@@ -327,7 +330,7 @@ for ordering the patches.")
     allrefs = getrefs()
     basehash = gethash(base)
     patches = []
-    for branchname, metafile in branchmeta:
+    for branchname, header in branchmeta:
         l = fnmatch.filter(allrefs, branchname) # FIXME: Use git rev-parse?
         if l and len(l) == 1:
             fref = l[0]
@@ -339,7 +342,7 @@ for ordering the patches.")
         pname = os.tempnam('/tmp', 'patch')
         gitdiff(base, fref, pname, opts.exclude)
         patches.append({'patchfile' : pname,
-            'metafile' : metafile,
+            'header' : header,
             'basename' : os.path.basename(branchname),
             'fref' : fref,
             'frefhash' : frefhash })
@@ -405,16 +408,14 @@ for ordering the patches.")
                 shutil.copyfileobj(fsrc, fdst)
 
     numformat = "%02d_" if len(patches) < 50 else "%04d_"
-    def movefeat(i, n, metafile=None):
+    def movefeat(i, n, headerstr=None):
         pname = (numformat + "%s.patch") % (n, patches[i]['name'])
         print("Writing patch %s" % pname)
         patchnames.append(pname)
-        if metafile:
-            with open(metafile) as fin:
-                metastr = fin.read(-1)
+        if headerstr:
             refstr = r'\1Git-Diff: %s..%s\n' \
                 % (basehash[:30], patches[i]['frefhash'][:30])
-            outstr = re.sub(r'(Git-Branch:.*\n)', refstr, metastr)
+            outstr = re.sub(r'(Git-Branch:.*\n)', refstr, headerstr)
             with open(patchdir + pname, 'w') as fout:
                 fout.write(outstr)
         appendfile(patches[i]['patchfile'], patchdir + pname)
@@ -433,7 +434,7 @@ for ordering the patches.")
         if revpatches[i]:
             moverev(i, pno)
             pno = pno+1
-        movefeat(i, pno, patches[i]['metafile'])
+        movefeat(i, pno, patches[i]['header'])
         pno = pno+1
 
     if have_respatch:
