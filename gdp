@@ -24,7 +24,7 @@ set -e
 patchdir="debian/patches"
 metadir="debian/metapatches"
 seriesfile="${patchdir}/series"
-prefix="p/"
+prefix=${GDP_BRANCH_PREFIX:-"p/"}
 pext=".patch"
 debbranch="master"
 upbranch="upstream"
@@ -36,7 +36,7 @@ usage ()
 {
     cat >&2 << EOM
 Usage:
-    $(basename "$0") [ refresh | tag-heads| new-patch <name> | pick <branch> <commit> | merge-upstream | merge-patches | log [ <patchbranch ] ]
+    $(basename "$0") [-p <branch-prefix>] [refresh | tag-heads | new-patch <name> | pick <branch> <commit> | merge-upstream | merge-patches | log [<patchbranch]]
 
 git debian patch helper.
 
@@ -53,11 +53,18 @@ Commands:
                 branch with suitable 'git merge' options.
     merge-patches
                 Merge all patch branches with the correct prefix
-                (default '$prefix') to the current branch with suitable
+                (now '$prefix') to the current branch with suitable
                 'git merge' options.
     log [<patchbranch>]
                 Run 'git log' showing only commits made directly to a patch
                 branch, leaving out upstream commits or merges.
+
+Options:
+    -p, --branch-prefix
+                Set the patch branch prefix used in subcommands like
+                'merge-patches' and 'refresh'. You can also set this via
+                GDP_BRANCH_PREFIX environment variable.
+                Currently set to '$prefix'.
 EOM
 #Options:
 #    -x      ?
@@ -267,6 +274,8 @@ PROGNAME=$(basename $0)
 case $1 in
     "" | "-h" | "--help")
         usage 1 "" ;;
+    -p|--branch-prefix)
+        shift ; prefix="$1" ; shift ;;
     refresh)
         shift ; refresh ;;
     tag-heads)
