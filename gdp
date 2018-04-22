@@ -92,7 +92,10 @@ refresh ()
 {
     dh_testdir
     rm -f ${patchdir}/debian-changes-*
-    git-genpatches -a -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
+    # Metapatch-based refresh
+#    git-genpatches -a -s -x '^debian/' -m $metadir -p $patchdir -b $upbranch -d $debbranch
+    # Prefix-based refresh
+    git branch --list "${prefix}*" | xargs git-genpatches -a -s -x '^debian/' -b "$upbranch" -d "$debbranch"
 }
 
 
