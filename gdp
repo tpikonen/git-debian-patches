@@ -99,6 +99,20 @@ refresh ()
 }
 
 
+
+# gethash <ref>
+# Return the hash from a branch name under ref/heads read with 'git show-ref'
+gethash ()
+{
+    local H
+
+    H=$(git show-ref --verify "refs/heads/$1" | head -n1 \
+        | sed 's/^\([a-f0-9]*\) .*$/\1/')
+    [ -z "$H" ] && die 1 "Branch '$1' not found."
+    echo "$H"
+}
+
+
 # tag-heads [$VERSION]
 # Tag current git branch heads with the (debian) version.
 # If $VERSION is not given, get it from debian/changelog.
@@ -108,31 +122,42 @@ refresh ()
 # tagged with debian/$VERSION to be compatible with git-buildpackage.
 tagheads ()
 {
+    local gitdir refdir fulldir
     dh_testdir
     version=$1
     # FIXME: Check if the version string makes sense
     if [ -z ${version} ] && [ "${version+xxx}" = "xxx" ] ; then
         version=$(dpkg-parsechangelog | sed -n 's/^Version: \(.*\)$/\1/p')
+        echo "Found version '$version'"
     fi
-    echo "Tagging ${debbranch} with ${version}/${debbranch}"
-    git tag ${version}/${debbranch} ${debbranch}
-    echo "Tagging ${upbranch} with ${version}/${upbranch}"
-    git tag ${version}/${upbranch} ${upbranch}
+    gitdir=$(git rev-parse --git-dir)
+    refdir="refs/gdp"
+    fulldir="${gitdir}/${refdir}/${version}"
+    echo "Making ref '${refdir}/${version}/${debbranch}'"
+    mkdir -p "$(dirname "${fulldir}/${debbranch}")"
+    echo "$(gethash "$debbranch")" > "${fulldir}/${debbranch}"
+    echo "Making ref '${refdir}/${version}/${upbranch}'"
+    mkdir -p "$(dirname "${fulldir}/${upbranch}")"
+    echo "$(gethash "$upbranch")" > "${fulldir}/${upbranch}"
     if git rev-parse --verify -q ${pristbranch} > /dev/null ; then
-        echo "Tagging ${pristbranch} with ${version}/${pristbranch}"
-        git tag ${version}/${pristbranch} ${pristbranch}
+        echo "Making ref '${refdir}/${version}/${pristbranch}'"
+        mkdir -p "$(dirname "${fulldir}/${pristbranch}")"
+        echo "$(gethash "$pristbranch")" > "${fulldir}/${pristbranch}"
     else
         echo "No '${pristbranch}' branch found."
     fi
-    i=1
-    for metafile in ${metadir}/*
+#    for metafile in ${metadir}/*
+#    do
+#        branch=$(sed -n 's/Git-Branch: *\(.*\)$/\1/p' $metafile)
+#        echo "Tagging ${branch} with ${version}/${branch}"
+#        git tag ${version}/${branch} ${branch}
+#    done
+    for branch in $(git branch --list "${prefix}*")
     do
-        branch=$(sed -n 's/Git-Branch: *\(.*\)$/\1/p' $metafile)
-        echo "Tagging ${branch} with ${version}/${branch}"
-        git tag ${version}/${branch} ${branch}
+        echo "Making ref '${refdir}/${version}/${branch}'"
+        mkdir -p "$(dirname "${fulldir}/${branch}")"
+        echo "$(gethash "$branch")" > "${fulldir}/${branch}"
     done
-    echo "Tagging ${debbranch} with debian/${version}"
-    git tag debian/${version} ${debbranch}
 }
 
 
