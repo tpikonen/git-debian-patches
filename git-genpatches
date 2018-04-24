@@ -53,7 +53,7 @@ def getclusters(patches, name_clusters=False):
         f1 = p1['patchfile']
         for p2 in patches[(i+1):]:
             f2 = p2['patchfile']
-            cmd = ['conflictdiff', f1, f2]
+            cmd = ['overlapdiff', f1, f2]
             logging.debug("Running: %s" % cmd)
             f = subprocess.Popen(cmd, stdout=subprocess.PIPE).stdout
             L = f.readline(80)
@@ -61,7 +61,7 @@ def getclusters(patches, name_clusters=False):
             if hasconflict:
                 p1['conflicts'].append(p2)
                 p2['conflicts'].append(p1)
-                f.read(-1) # Read rest of conflictdiff output
+                f.read(-1) # Read rest of overlapdiff output
             f.close()
 
     def dfs(pd, acc):
@@ -260,7 +260,7 @@ def apply_cluster(c, base, exclude):
         currstate = os.tempnam()
         gitdiff(base, "HEAD", currstate, exclude)
         tname = os.tempnam()
-        cmd = "conflictdiff -r -o "+tname+" "+currstate+" "+p['patchfile']
+        cmd = "overlapdiff -r -o "+tname+" "+currstate+" "+p['patchfile']
         frob(cmd)
         os.remove(currstate)
         try:
@@ -398,7 +398,7 @@ for ordering the patches.")
     fullpatch = os.tempnam()
     gitdiff(tmpbranch, dest, fullpatch, opts.exclude)
     restname = os.tempnam()
-    cmd = "conflictdiff %s %s | filterdiff > %s" \
+    cmd = "overlapdiff %s %s | filterdiff > %s" \
         % (fullpatch, currstate, restname)
     frob(cmd)
     os.remove(currstate)
