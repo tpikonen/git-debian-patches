@@ -287,22 +287,34 @@ merge_patches ()
     echo "$branches"
     git merge-base --is-ancestor "$upbranch" "$currbranch" \
         || die 1 "Current branch is not merged with branch '$upbranch'."
+    for patchbranch in $branches ; do
+        git merge-base --is-ancestor "$upbranch" "$patchbranch" \
+            || die 1 "Branch '$patchbranch' is not merged with '$upbranch'."
+    done
     tmpout=$(tempfile)
     for patchbranch in $branches ; do
-        if git merge-base --is-ancestor "$upbranch" "$patchbranch" ; then
-            echo "Processing branch $patchbranch"
-            # The 'resolve' strategy seems to pick up the correct merge base
-            # (i.e. upstream, or $upbranch) better than 'recursive'.
-            git merge --squash -s resolve "$patchbranch" &> $tmpout \
-                || { echo "Merge failed:" ; cat "$tmpout" ; false ; }
-            # commit but exclude everything under 'debian/' (i.e. headers)
-            git commit -m "$patchbranch + $upbranch merge result." \
-                -- . ':!debian/' &> $tmpout || cat "$tmpout"
-            # remove headers from index and tree
-            git reset --hard HEAD &> $tmpout || cat "$tmpout"
+        # TODO: Drop out to shell to allow for manual merge
+        echo "Processing branch $patchbranch"
+        if [ "$(git merge-base -a HEAD "$patchbranch" | wc -l)" == "1" ] ; then
+            # Only 1 common ancestor, so real recursive merge is not needed.
+            # Use 'recursive' strategy with conflicts autoresolved to
+            # 'theirs' i.e. the patch branch
+            git merge --squash -s recursive -X theirs "$patchbranch" \
+                &> $tmpout \
+                || { echo "'gdp merge-patches' failed, you probably need to squash merge patch branches manually:" ; cat "$tmpout" ; false ; }
         else
-            die 1 "Branch '$patchbranch' is not merged with '$upbranch'."
+            # git merge-base found more than 1 common ancestor,
+            # so use 'resolve' strategy, which seems to use upstream as
+            # merge base anyway, but conflicts cannot be auto-resolved
+            echo "gdp warning: Using 'resolve' merge strategy. No conflict autoresolution!"
+            git merge --squash -s resolve "$patchbranch" &> $tmpout \
+                || { echo "'gdp merge-patches' failed, you probably need to squash merge patch branches manually:" ; cat "$tmpout" ; false ; }
         fi
+        # commit but exclude everything under 'debian/' (i.e. headers)
+        git commit -m "$patchbranch + $upbranch merge result." \
+            -- . ':!debian/' &> $tmpout || cat "$tmpout"
+        # remove headers from index and tree
+        git reset --hard HEAD &> $tmpout || cat "$tmpout"
     done
     rm -f "$tmpout"
 }
