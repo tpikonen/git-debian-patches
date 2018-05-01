@@ -163,34 +163,37 @@ tagheads ()
 
 # newpatch patchname
 # Create a new patch branch branching from current upstream and
-# start the editor with a partially filled DEP-3 header in $metadir
+# start the editor with a partially filled DEP-3 header file in the branch.
 newpatch ()
 {
     dh_testdir
     patchname=$1
-    pnum_width=2 # Number of characters in metapatch number
+    patchname=${patchname#$prefix}
     if [ ${#patchname} -lt 1 ] ; then
         echo "You must give a patch name."
         exit 1
     fi
-    if [ ! -d $metadir ] ; then
-        if [ -e $metadir ] ; then
-            echo "Error: $metadir exists, but is not a directory."
-            exit 1
-        fi
-        mkdir -p $metadir
-    fi
-    npatches=$(ls $metadir | wc -l)
-    echo "You have currently $npatches patches."
-    lastpatch=$(ls ${metadir} | tail -n 1)
-    lastnum=$(echo ${lastpatch} | head -c ${pnum_width})
-    echo "Last metapatch is ${lastpatch} with number ${lastnum}"
-    pnum=$(expr ${lastnum} + 1)
+#    pnum_width=2 # Number of characters in metapatch number
+#    if [ ! -d $metadir ] ; then
+#        if [ -e $metadir ] ; then
+#            echo "Error: $metadir exists, but is not a directory."
+#            exit 1
+#        fi
+#        mkdir -p $metadir
+#    fi
+#    npatches=$(ls $metadir | wc -l)
+#    echo "You have currently $npatches patches."
+#    lastpatch=$(ls ${metadir} | tail -n 1)
+#    lastnum=$(echo ${lastpatch} | head -c ${pnum_width})
+#    echo "Last metapatch is ${lastpatch} with number ${lastnum}"
+#    pnum=$(expr ${lastnum} + 1)
     branchname=${prefix}${patchname}
-    echo "Creating a new branch $branchname ..."
-    git branch $branchname $upbranch
-    metaname=$(printf "%s/%0${pnum_width}d_%s" $metadir $pnum $patchname)
-    describe_patch "$metaname"
+    echo "Creating a new branch '$branchname' ..."
+#    git branch $branchname $upbranch
+#    metaname=$(printf "%s/%0${pnum_width}d_%s" $metadir $pnum $patchname)
+#    describe_patch "$metaname"
+    git checkout -b "$branchname" "$upbranch"
+    describe_patch "$DEP3dir/$patchname"
 }
 
 # describe_patch filename
