@@ -1,59 +1,142 @@
-How to update Debian sources with a new upstream version
-========================================================
+# gdp - the Git Debian Patch helper
 
-1. Update the 'upstream' and 'pristine-tar' branches with the 'git import-orig'
-command from git-buildpackage.
+gdp is a helper program for maintaining Debian packages with the '3.0
+(quilt)' source format. The aim of gdp is to allow changes made to the
+upstream sources to be directly committed to the Debian branch (usually
+'master'), but also represented in the source package as a series of patch
+files sorted into different topics or features. It allows changing the
+upstream sources directly without manually editing diff-files while also
+producing a clean set of patches organized by topic.
 
-git import-orig --no-merge --pristine-tar ../upstream_ver.orig.tar.gz
+The upstream-changing commits are made directly to the master branch, but
+are also cherry-picked to git topic branches called patchbranches, one for
+each patch. The actual patch files are generated (or 'refreshed') from the
+topic branches and an optional DEP3 header file by the `gdp refresh`
+subcommand.
 
+The `gdp` script and its subcommands are designed to help in common git
+related tasks in Debian package management, but they also set a kind of soft
+policy in repository organization, branch naming etc.
 
-2. Merge the updated 'upstream' branch to all of the patch ('p/*') branches.
-Resolve conflicts with git mergetool or by hand.
+An overview of subcommands can be obtained by running the executable `gdp`
+without parameters:
+```
+$ gdp
+Usage:
+    gdp [-p <branch-prefix>] [refresh | tag-heads | new-patch <name> | pick
+<patchbranch> <commit> | merge-upstream | merge-patches | log
+[<patchbranch>] | add-header <patchbranch> ]
 
-git checkout p/makefile ; git merge upstream ; git mergetool ; git commit
-git checkout p/feature1 ; git merge upstream ; git mergetool ; git commit
-git checkout p/feature2 ; git merge upstream ; git mergetool ; git commit
+git debian patch helper.
 
+Commands:
+    refresh     Generate debian/patches from patch branches.
+    tag-heads   Tag upstream, debian and patch branches for release.
+    new-patch <name>
+                Create a new patch + branch with a given name.
+    pick <patchbranch> <commit>
+                Cherry pick <commit> to <branch> without leaving
+                the current branch.
+    merge-upstream
+                Merge upstream branch (default 'upstream') to the current
+                branch with suitable 'git merge' options.
+    merge-patches
+                Merge all patch branches with the correct prefix
+                (default 'p/') to the current branch with suitable
+                'git merge' options.
+    log [<patchbranch>]
+                Run 'git log' showing only commits made directly to a patch
+                branch, leaving out upstream commits or merges.
+    add-header <patchbranch>
+                Add a DEP3 header skeleton to a patch branch and run an
+                editor on it.
 
-3a. Create a temporary branch starting from one of the patch branches.
+Options:
+    -p, --branch-prefix
+                Set the prefix used in 'merge-patches' subcommand.
+                You can also set this via GDP_BRANCH_PREFIX environment
+                variable.
 
-git checkout -b temp p/makefile
+```
 
+Below a set of common package management tasks using gdp is reviewed. It is
+assumed that the repository has the default branch naming with 'master'
+branch holding the Debian version, 'upstream' the unmodified upstream
+sources and the patch branches starting with 'p/'. Having a 'pristine-tar'
+branch for holding the upstream source archive is also a good idea, but not
+required by gdp.
 
-3b. Merge all the patch branches to the temporary branch and resolve
-conflicts. This branch is now the patched upstream source without Debian
-files. The merge can be an octopus merge:
+## How to start a new patch
 
-git merge p/feature1 p/feature2
+A commit changing upstream sources in your package has just been made and
+you want to turn it into a patch file under 'debian/patches'. Running
 
-or if merging several, possibly conflicting branches is too complicated,
-a serial merging of all the patch branches
+```
+gdp new-patch foo
+```
 
-git merge p/feature1
-git merge p/feature2
+will create a git branch 'p/foo' branched from 'upstream' and launch an
+editor with a DEP3 header partially filled. You should fill the headers,
+delete the empty or unnecessary ones and describe the patch. After you
+have edited the header file to your liking, saving and exiting the editor
+will leave you with the newly created patch branch checked out, identical to
+the upstream branch, except for the header file at
+'debian/dep3-headers/foo'. You should commit this file.
 
+You can now either cherry pick commits from 'master' to this branch, or
+checkout the master branch again and use the reverse cherry-pick command
+`gdp pick p/foo <commit>`, which lets you pick a commit to a patch branch
+while having the master branch checked out.
 
-4. Store the state of the 'temp' branch to the master branch. The conflicts
-are already resolved in the 'temp' branch, so the merge strategy should be
-'theirs'. Do not commit the merge yet.
+If you need to update the patch later, just cherry-pick more commits to the
+patch branch.
 
-git co master; git merge --squash -s recursive -X theirs temp
+## How to update ('refresh') patches
 
+## How to view the commits belonging to a patch
 
-5. Manipulate the merge information, so that the merge looks like it has
-been made from upstream to master:
+## How to update Debian sources with a new upstream version
 
-git rev-parse upstream > .git/MERGE_HEAD
-echo "Merge from upstream branch with merged patches" > .git/COMMIT_EDITMSG
+ 1. Update the 'upstream' and 'pristine-tar' branches with the
+ `gbp import-orig` command from git-buildpackage.
+ ```
+ gbp import-orig --no-merge --pristine-tar ../upstream_ver.orig.tar.gz
+ ```
 
+ 2. Merge upstream sources to the master (debian) branch, preserving local
+ changes (i.e. old patches) in the Debian version (This command just runs
+ `git merge -s recursive -Xours upstream`)
+ ```
+ gdp merge-upstream
+ ```
 
-6. Commit the merge:
+ 3. Merge the 'upstream' branch to all of the patch ('p/*') branches.
+ Resolve conflicts with git mergetool or by hand.
+ ```
+ git checkout p/makefile ; git merge upstream ; git mergetool ; git commit
+ git checkout p/feature1 ; git merge upstream ; git mergetool ; git commit
+ git checkout p/feature2 ; git merge upstream ; git mergetool ; git commit
+ ```
 
-git commit
+ 4. Do a squash merge of the merge results in patch branches to the master
+ branch by running
+ ```
+ gdp merge-patches
+ ```
 
+The `merge-patches` command checks that each patch branch (branches starting
+with 'p/' or whatever is given in --prefix) is descended from 'upstream'
+(i.e. it was merged to the current upstream version) and tries hard to merge
+in the changes in the patch branch without needing manual conflict resolution.
+It does this by running `git merge --squash -s recursive -X theirs p/foo`.
 
-7. At this point you can start working on the debian/ files, add new
-patches and revise the old ones. When you are sure that the merge went ok,
-and does not need fixing you can delete the 'temp' branch.
+Squash merges are used to keep the ancestry graph of the master branch sane.
 
-git branch -D temp
+Sometimes a recursive merge cannot be made (see source) and the 'resolve'
+merge strategy is tried instead. It has a greater likelihood of failing due
+to conflicts. In any case, if a patch branch merge fails due to conflict or
+otherwise, you are currently better off doing the rest of the patch branch
+squash merges manually (sorry).
+
+After all the patch branches are successfully merged, the master branch is
+ready for further packaging work.
