@@ -287,7 +287,7 @@ def apply_cluster(c, base, exclude):
 def main():
     default_base = "upstream"
     default_dest = "master"
-    default_patchdir = "debian/patches/"
+    default_patchdir = "debian/patches"
     oprs = OptionParser(usage=usage, description=description)
     oprs.add_option("-b", "--base", type="string", dest="base", \
         default=default_base, metavar="<commit-ish>", \
@@ -417,7 +417,7 @@ for ordering the patches.")
     seriesfile = patchdir + "series"
     if os.path.isfile(seriesfile):
         logging.info("Removing files from previous seriesfile %s" % seriesfile)
-        with open(patchdir + "series") as fs, open(os.devnull, 'w') as dnull:
+        with open(seriesfile) as fs, open(os.devnull, 'w') as dnull:
             for line in fs:
                 filename = patchdir + line.rstrip()
                 cmd = ['git', 'rm', filename]
@@ -475,8 +475,8 @@ for ordering the patches.")
         logging.error("Found differences not representable in the final patch!")
 
     if series:
-        print("Writing series file to %s" % patchdir + "series")
-        f = open(patchdir + "series", "w")
+        print("Writing series file to %s" % seriesfile)
+        f = open(seriesfile, "w")
         for p in patchnames:
             f.write(p + "\n")
         f.close()
