@@ -37,7 +37,7 @@ usage ()
 {
     cat >&2 << EOM
 Usage:
-    $(basename "$0") [-p <branch-prefix>] [refresh | tag-heads | new-patch <name> | pick <patchbranch> <commit> | merge-upstream | merge-patches | log [<patchbranch>] | add-header <patchbranch> ]
+    $(basename "$0") [-p <branch-prefix>] [refresh | tag-heads | new-patch <name> | pick <patchbranch> <commit> | merge-patches | log [<patchbranch>] | add-header <patchbranch> ]
 
 git debian patch helper.
 
@@ -49,9 +49,6 @@ Commands:
     pick <patchbranch> <commit>
                 Cherry pick <commit> to <branch> without leaving
                 the current branch.
-    merge-upstream
-                Merge upstream branch (default '$upbranch') to the current
-                branch with suitable 'git merge' options.
     merge-patches
                 Merge all patch branches with the correct prefix
                 (now '$prefix') to the current branch with suitable
@@ -70,6 +67,9 @@ Options:
                 GDP_BRANCH_PREFIX environment variable.
                 Currently set to '$prefix'.
 EOM
+#    merge-upstream
+#                Merge upstream branch (default '$upbranch') to the current
+#                branch with suitable 'git merge' options.
 #Options:
 #    -x      ?
 #EOM
@@ -262,16 +262,16 @@ pick ()
 }
 
 
-# merge-upstream
-# Merge upbranch to debbranch with suitable git merge options
-merge_upstream ()
-{
-    dh_testdir
-    currbranch=$(git symbolic-ref --short HEAD)
-#    [ "$currbranch" = "$debbranch" ] \
-#        || die 1 "Current branch is not the Debian branch ($debbranch)."
-    git merge -s recursive -X ours "$upbranch"
-}
+## merge-upstream
+## Merge upbranch to debbranch with suitable git merge options
+#merge_upstream ()
+#{
+#    dh_testdir
+##    currbranch=$(git symbolic-ref --short HEAD)
+##    [ "$currbranch" = "$debbranch" ] \
+##        || die 1 "Current branch is not the Debian branch ($debbranch)."
+#    git merge -s recursive -X ours "$upbranch"
+#}
 
 
 # merge_patches
